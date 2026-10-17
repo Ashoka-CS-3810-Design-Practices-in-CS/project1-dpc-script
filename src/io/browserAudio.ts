@@ -7,3 +7,17 @@ export function createDecodeContext(): {
   // An offline context resamples to the project rate and needs no user gesture.
   return new OfflineAudioContext(1, 1, SAMPLE_RATE);
 }
+
+/** The context playback runs on. Created on the first Play, which is a user gesture. */
+export function createLiveContext(): AudioContext {
+  return new AudioContext({ sampleRate: SAMPLE_RATE, latencyHint: 'interactive' });
+}
+
+/** The context an export is rendered on. */
+export function createOfflineContext(
+  channels: number,
+  length: number,
+  sampleRate: number,
+): OfflineAudioContext {
+  return new OfflineAudioContext(channels, length, sampleRate);
+}
