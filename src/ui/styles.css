@@ -1,0 +1,205 @@
+/* Colours and sizes both of us use. No dark mode. */
+:root {
+  --bg: #ffffff;
+  --panel-bg: #f3f4f6;
+  --fg: #111827;
+  --muted-fg: #4b5563;
+  --border: #c4c9d0;
+  --accent: #1565c0;
+  --mute: #d32f2f; /* the M button, red */
+  --solo: #f9a825; /* the S button, yellow */
+  --selection: rgba(255, 152, 0, 0.35); /* highlighted region, orange */
+  --invalid: #d32f2f;
+  --focus: #1565c0;
+
+  --bar-height: 44px;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+button,
+select,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+/* Everything clickable is at least 24 × 24 px (A3 §4.7). */
+button,
+select,
+input[type='checkbox'],
+input[type='radio'] {
+  min-width: 24px;
+  min-height: 24px;
+}
+
+button {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--panel-bg);
+}
+
+button:disabled {
+  color: var(--muted-fg);
+  cursor: default;
+}
+
+button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+button.primary:hover:not(:disabled) {
+  background: #0d47a1;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- layout ---- */
+
+.app {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto auto;
+  height: 100%;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--bar-height);
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-bg);
+}
+
+.timeline-area {
+  min-height: 0; /* lets the timeline shrink instead of pushing the page taller */
+  overflow: hidden;
+}
+
+.status-line {
+  min-height: 24px;
+  padding: 4px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--panel-bg);
+  color: var(--muted-fg);
+}
+
+/* ---- toasts ---- */
+
+.toasts {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--border);
+  border-left-width: 6px;
+  border-radius: 4px;
+  background: var(--bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.toast-success {
+  border-left-color: #2e7d32;
+}
+
+.toast-warning {
+  border-left-color: var(--solo);
+}
+
+.toast-error {
+  border-left-color: var(--invalid);
+}
+
+.toast-icon {
+  font-weight: bold;
+}
+
+.toast-message {
+  flex: 1;
+}
+
+.toast button {
+  border: none;
+  background: transparent;
+}
+
+/* ---- confirmation dialog ---- */
+
+.confirm-dialog {
+  max-width: 420px;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+}
+
+.confirm-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.confirm-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.confirm-dialog p {
+  margin: 0 0 16px;
+}
+
+.dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
