@@ -6,6 +6,9 @@ import { SAMPLE_RATE } from '@/model/constants';
  *  raw samples, for 1 000 random signals. */
 
 const SIGNALS = 1000;
+/** ~2 s alone, but over Vitest's 5 s default when every test file runs in parallel under
+ *  coverage on a slower machine. */
+const TIMEOUT_MS = 30_000;
 
 /** Small seeded generator (mulberry32) so failures can be reproduced. */
 function random(seed: number): () => number {
@@ -33,7 +36,7 @@ function bruteMinMax(channels: Float32Array[], from: number, to: number): [numbe
 }
 
 describe('peak pyramid vs brute force (random)', () => {
-  it(`agrees on ${SIGNALS} random signals`, () => {
+  it(`agrees on ${SIGNALS} random signals`, { timeout: TIMEOUT_MS }, () => {
     const rand = random(3810);
     const blockSizes = [1, 3, 4, 16, 64];
     for (let n = 0; n < SIGNALS; n++) {
