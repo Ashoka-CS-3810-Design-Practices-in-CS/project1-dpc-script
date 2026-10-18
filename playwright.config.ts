@@ -6,7 +6,12 @@ export default defineConfig({
   globalSetup: './e2e/global-setup.ts',
   use: { baseURL: 'http://localhost:5173' },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      // Headless Chromium has no sound card, so its audio clock never advances; this flag gives
+      // it one (without it, playback would sit at 0 s).
+      use: { ...devices['Desktop Chrome'], launchOptions: { args: ['--disable-audio-output'] } },
+    },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
