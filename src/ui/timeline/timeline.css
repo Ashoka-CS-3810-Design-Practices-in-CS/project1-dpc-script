@@ -1,0 +1,68 @@
+/* Timeline layout. Uses the shared variables from styles.css; the --tl-* variables are only
+   the timeline's own canvas colours. */
+.timeline {
+  --tl-row-selected: #e3effc;
+  --tl-clip-bg: #dbe7f5;
+  --tl-clip-header: #b9cfe8;
+  --tl-waveform: #1f4e8c;
+  --tl-fade-shade: rgba(17, 24, 39, 0.18);
+
+  height: 100%;
+  min-height: 0;
+}
+
+.timeline-scroll {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto; /* headers and canvas scroll vertically together */
+}
+
+.timeline-content {
+  display: flex;
+  align-items: stretch;
+}
+
+.track-headers {
+  flex: none;
+  border-right: 1px solid var(--border);
+  background: var(--panel-bg);
+}
+
+.track-headers-ruler {
+  border-bottom: 1px solid var(--border);
+}
+
+.track-header {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.track-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-canvas-area {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.timeline-canvas-area canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.empty-project {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 100%;
+  color: var(--muted-fg);
+}
