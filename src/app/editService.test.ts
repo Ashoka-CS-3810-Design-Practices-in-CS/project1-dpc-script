@@ -579,3 +579,106 @@ describe('setFades (README §9.5 R2)', () => {
     expect(edit.setFades('nope', 0, 0)).toEqual({ ok: false, error: MSG.editNoClip });
   });
 });
+
+// ---------- A3 Table 2 (timeline and editing): invalid input leaves the project unchanged,
+// makes no commit and shows the exact message ----------
+
+describe('A3 Table 2: split point (d = 8)', () => {
+  it('4 is accepted', () => {
+    const { t, id } = clipWithFades(0, 8);
+    expect(edit.split(id, 4).ok).toBe(true);
+    expect(spans(t)).toEqual([
+      [0, 4],
+      [4, 4],
+    ]);
+  });
+
+  it.each([0.02, 7.99])('%d is rejected', (at) => {
+    const { id } = clipWithFades(0, 8);
+    expectNoChange(() =>
+      expect(edit.split(id, at)).toEqual({ ok: false, error: MSG.editTooShort }),
+    );
+  });
+});
+
+describe('A3 Table 2: fade lengths (d = 8)', () => {
+  it('0.5 / 1.0 is accepted', () => {
+    const { t, id } = clipWithFades(0, 8);
+    expect(edit.setFades(id, 0.5, 1.0).ok).toBe(true);
+    expect(numbers(t)).toEqual([[0, 0, 8, 0.5, 1]]);
+  });
+
+  it.each([
+    ['−1', -1, 0, MSG.fadeInvalid],
+    ['"abc"', Number('abc'), 0, MSG.fadeInvalid], // what a typed "abc" becomes
+    ['5 / 5', 5, 5, MSG.fadeTooLong],
+  ])('%s is rejected', (_, a, b, message) => {
+    const { id } = clipWithFades(0, 8);
+    expectNoChange(() => expect(edit.setFades(id, a, b)).toEqual({ ok: false, error: message }));
+  });
+});
+
+describe('A3 Table 2: track name', () => {
+  it('"Narration" is accepted', () => {
+    const t = edit.addTrack();
+    expect(edit.renameTrack(t, 'Narration').ok).toBe(true);
+    expect(track(t).name).toBe('Narration');
+  });
+
+  it.each([
+    ['empty', '', MSG.nameEmpty],
+    ['all spaces', '   ', MSG.nameEmpty],
+    ['65 characters', 'n'.repeat(65), MSG.nameTooLong],
+  ])('%s is rejected', (_, name, message) => {
+    const t = edit.addTrack();
+    expectNoChange(() => expect(edit.renameTrack(t, name)).toEqual({ ok: false, error: message }));
+  });
+});
+
+describe('A3 Table 1/2: drop position', () => {
+  it.each([
+    [-2, 0],
+    [-0.001, 0],
+    [0, 0],
+  ])('a start of %d is moved to %d', (start, expected) => {
+    const t = edit.addTrack();
+    const id = place(t, 's1', 5, 2);
+    expect(edit.moveClip(id, t, start).ok).toBe(true);
+    expect(spans(t)).toEqual([[expected, 2]]);
+  });
+});
+
+describe('edge cases', () => {
+  it('a track whose only clip is deleted is empty and still usable', () => {
+    const { t, id } = clipWithFades(2, 4);
+    expect(edit.deleteRegion(id, 2, 6).ok).toBe(true);
+    expect(track(t).clips).toEqual([]);
+    expect(registry.get('s1')).toBeUndefined();
+    // The empty track takes a new clip and can be renamed and muted as before.
+    expect(edit.addClip(t, 's2', 1, 0).ok).toBe(true);
+    expect(edit.renameTrack(t, 'Again').ok).toBe(true);
+    edit.toggleMute(t);
+    expect(track(t)).toMatchObject({ name: 'Again', muted: true });
+  });
+
+  it('mono and stereo sources live in one project', () => {
+    registry.add({
+      id: 'stereo',
+      fileName: 'stereo.wav',
+      status: 'ready',
+      buffer: fakeAudioBuffer({ duration: 5, channels: 2 }),
+      peaks: null,
+      refCount: 0,
+    });
+    const t = edit.addTrack();
+    const mono = place(t, 's1', 0, 3);
+    const stereo = place(t, 'stereo', 0, 5); // lands after the mono clip
+    expect(spans(t)).toEqual([
+      [0, 3],
+      [3, 5],
+    ]);
+    expect(edit.split(stereo, 5).ok).toBe(true);
+    expect(edit.split(mono, 1).ok).toBe(true);
+    expect([refCount('s1'), refCount('stereo')]).toEqual([2, 2]);
+  });
+});
