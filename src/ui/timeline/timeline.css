@@ -22,29 +22,6 @@
   align-items: stretch;
 }
 
-.track-headers {
-  flex: none;
-  border-right: 1px solid var(--border);
-  background: var(--panel-bg);
-}
-
-.track-headers-ruler {
-  border-bottom: 1px solid var(--border);
-}
-
-.track-header {
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--border);
-}
-
-.track-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .timeline-canvas-area {
   position: relative;
   flex: 1;
@@ -65,4 +42,13 @@
   gap: 12px;
   height: 100%;
   color: var(--muted-fg);
+}
+
+.empty-project p {
+  margin: 0;
+}
+
+.empty-project-buttons {
+  display: flex;
+  gap: 8px;
 }
