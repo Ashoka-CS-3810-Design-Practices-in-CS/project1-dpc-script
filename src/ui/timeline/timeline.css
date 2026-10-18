@@ -28,6 +28,16 @@
   min-width: 0;
 }
 
+/* Over the canvas ruler so its focus outline shows there; clicks go through to the canvas. */
+.ruler-slider {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
 .timeline-canvas-area canvas {
   position: absolute;
   top: 0;
