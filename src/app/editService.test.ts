@@ -335,3 +335,247 @@ describe('removeClip', () => {
     expectNoChange(() => edit.removeClip('nope'));
   });
 });
+
+// ---------- Part 2: trim, split, region delete, fades (A5, A7) ----------
+
+const clipById = (id: string) =>
+  store
+    .get()
+    .tracks.flatMap((t) => t.clips)
+    .find((c) => c.id === id);
+
+/** [startTime, sourceOffset, duration, fadeIn, fadeOut] of every clip on the track. */
+const numbers = (id: TrackId) =>
+  track(id).clips.map((c) => [c.startTime, c.sourceOffset, c.duration, c.fadeIn, c.fadeOut]);
+
+/** A clip of s1 on a new track, with fades, added through the service. */
+function clipWithFades(start: number, duration: number, fadeIn = 0, fadeOut = 0) {
+  const t = edit.addTrack();
+  const id = place(t, 's1', start, duration);
+  if (fadeIn || fadeOut) expect(edit.setFades(id, fadeIn, fadeOut).ok).toBe(true);
+  commits = [];
+  return { t, id };
+}
+
+describe('split', () => {
+  it('T1 split never copies audio', () => {
+    const buffer = registry.get('s1')!.buffer!;
+    const samples = buffer.getChannelData(0);
+    const { t, id } = clipWithFades(10, 8, 1, 1);
+
+    const r = edit.split(id, 14);
+    expect(r.ok).toBe(true);
+    const [left, right] = r.ok ? r.value : ['', ''];
+    expect(left).toBe(id); // the left piece keeps the original id
+    expect(right).not.toBe(id);
+    expect(track(t).clips.map((c) => c.id)).toEqual([left, right]);
+    expect(numbers(t)).toEqual([
+      [10, 0, 4, 1, 0],
+      [14, 4, 4, 0, 1],
+    ]);
+    expect(refCount('s1')).toBe(2);
+    // Both pieces point at the same, untouched audio.
+    expect(registry.get('s1')!.buffer).toBe(buffer);
+    expect(buffer.getChannelData(0)).toBe(samples);
+    expect(buffer.length).toBe(20 * 44100);
+    expect(commits).toEqual([{ kind: 'structure' }]);
+  });
+
+  it('T3 minimum clip length', () => {
+    const { t, id } = clipWithFades(0, 2);
+    expectNoChange(() =>
+      expect(edit.split(id, 0.049)).toEqual({ ok: false, error: MSG.editTooShort }),
+    );
+    expect(edit.split(id, 0.05).ok).toBe(true);
+    expect(numbers(t)).toEqual([
+      [0, 0, 0.05, 0, 0],
+      [0.05, 0.05, 1.95, 0, 0],
+    ]);
+  });
+
+  it('fails outside the clip or for an unknown clip, changing nothing', () => {
+    const { id } = clipWithFades(0, 2);
+    expectNoChange(() => {
+      expect(edit.split(id, 3)).toEqual({ ok: false, error: MSG.editOutsideClip });
+      expect(edit.split('nope', 1)).toEqual({ ok: false, error: MSG.editNoClip });
+    });
+  });
+});
+
+describe('trimToSelection', () => {
+  it('keeps the selection, moves the offset and shrinks fades to fit', () => {
+    const { t, id } = clipWithFades(10, 8, 2, 2);
+    expect(edit.trimToSelection(id, 12, 13)).toEqual({ ok: true, value: undefined });
+    expect(numbers(t)).toEqual([[12, 2, 1, 0.5, 0.5]]);
+    expect(clipById(id)).toBeDefined();
+    expect(refCount('s1')).toBe(1);
+    expect(commits).toEqual([{ kind: 'structure' }]);
+  });
+
+  it.each([
+    [10, 10.04, MSG.editTooShort],
+    [9, 12, MSG.editOutsideClip],
+    [12, 19, MSG.editOutsideClip],
+  ])('[%d, %d] fails with its message and changes nothing', (start, end, message) => {
+    const { id } = clipWithFades(10, 8);
+    expectNoChange(() =>
+      expect(edit.trimToSelection(id, start, end)).toEqual({ ok: false, error: message }),
+    );
+  });
+
+  it('an unknown clip fails', () => {
+    expect(edit.trimToSelection('nope', 0, 1)).toEqual({ ok: false, error: MSG.editNoClip });
+  });
+});
+
+describe('deleteRegion', () => {
+  it('the whole clip removes it and releases the source', () => {
+    const { t, id } = clipWithFades(10, 8);
+    expect(edit.deleteRegion(id, 10, 18).ok).toBe(true);
+    expect(track(t).clips).toEqual([]);
+    expect(registry.get('s1')).toBeUndefined(); // refCount 0 → freed
+    expect(commits).toEqual([{ kind: 'structure' }]);
+  });
+
+  it('a region touching the start trims the start, keeping the id and fades', () => {
+    const { t, id } = clipWithFades(10, 8, 1, 1);
+    expect(edit.deleteRegion(id, 10, 12).ok).toBe(true);
+    expect(track(t).clips.map((c) => c.id)).toEqual([id]);
+    expect(numbers(t)).toEqual([[12, 2, 6, 1, 1]]);
+    expect(refCount('s1')).toBe(1);
+  });
+
+  it('a region touching the end trims the end', () => {
+    const { t, id } = clipWithFades(10, 8, 1, 1);
+    expect(edit.deleteRegion(id, 15, 18).ok).toBe(true);
+    expect(numbers(t)).toEqual([[10, 0, 5, 1, 1]]);
+    expect(refCount('s1')).toBe(1);
+  });
+
+  it('a middle region leaves two pieces with a gap and retains once more', () => {
+    const { t, id } = clipWithFades(10, 8, 1, 1);
+    expect(edit.deleteRegion(id, 12, 15).ok).toBe(true);
+    expect(track(t).clips[0].id).toBe(id);
+    expect(numbers(t)).toEqual([
+      [10, 0, 2, 1, 0],
+      [15, 5, 3, 0, 1],
+    ]);
+    expect(refCount('s1')).toBe(2);
+    expect(commits).toEqual([{ kind: 'structure' }]);
+  });
+
+  it.each([
+    [10.02, 18, MSG.editTooShort], // would leave a 0.02 s piece
+    [12, 20, MSG.editOutsideClip],
+  ])('[%d, %d] fails with its message and changes nothing', (start, end, message) => {
+    const { id } = clipWithFades(10, 8);
+    expectNoChange(() =>
+      expect(edit.deleteRegion(id, start, end)).toEqual({ ok: false, error: message }),
+    );
+  });
+
+  it('an unknown clip fails', () => {
+    expect(edit.deleteRegion('nope', 0, 1)).toEqual({ ok: false, error: MSG.editNoClip });
+  });
+});
+
+describe('trimEdge', () => {
+  it('trims the start in and extends it back out, bringing the audio back', () => {
+    const { t, id } = clipWithFades(10, 8);
+    expect(edit.trimEdge(id, 'start', 13).ok).toBe(true);
+    expect(numbers(t)).toEqual([[13, 3, 5, 0, 0]]);
+    expect(edit.trimEdge(id, 'start', 10).ok).toBe(true);
+    expect(numbers(t)).toEqual([[10, 0, 8, 0, 0]]);
+    expect(commits).toEqual([{ kind: 'structure' }, { kind: 'structure' }]);
+  });
+
+  it('trims the end in and extends it out up to the end of the audio', () => {
+    const { t, id } = clipWithFades(10, 8);
+    expect(edit.trimEdge(id, 'end', 12).ok).toBe(true);
+    expect(numbers(t)).toEqual([[10, 0, 2, 0, 0]]);
+    expect(edit.trimEdge(id, 'end', 30).ok).toBe(true); // the 20 s file ends at 30
+    expect(numbers(t)).toEqual([[10, 0, 20, 0, 0]]);
+  });
+
+  it('stops at the neighbours, the file start and the clip minimum', () => {
+    const t = edit.addTrack();
+    place(t, 's2', 0, 4);
+    const id = place(t, 's1', 6, 4);
+    place(t, 's2', 12, 2);
+    expect(edit.trimEdge(id, 'start', 8).ok).toBe(true); // [8, 10), the file starts at 6
+    const outOfRange = { ok: false, error: MSG.editOutOfRange };
+    expectNoChange(() => {
+      expect(edit.trimEdge(id, 'start', 5)).toEqual(outOfRange); // before the file start
+      expect(edit.trimEdge(id, 'end', 12.1)).toEqual(outOfRange); // next clip starts at 12
+      expect(edit.trimEdge(id, 'end', 8.04)).toEqual(outOfRange); // shorter than 50 ms
+    });
+    expect(edit.trimEdge(id, 'end', 12).ok).toBe(true); // touching is allowed
+    expect(spans(t)).toEqual([
+      [0, 4],
+      [8, 4],
+      [12, 2],
+    ]);
+  });
+
+  it('stops at the end of the previous clip', () => {
+    const t = edit.addTrack();
+    place(t, 's2', 0, 4);
+    const id = place(t, 's1', 6, 4);
+    expect(edit.trimEdge(id, 'start', 8).ok).toBe(true);
+    expect(edit.moveClip(id, t, 5).ok).toBe(true); // [5, 7), the file now starts at 3
+    expectNoChange(() =>
+      expect(edit.trimEdge(id, 'start', 3.9)).toEqual({ ok: false, error: MSG.editOutOfRange }),
+    );
+    expect(edit.trimEdge(id, 'start', 4).ok).toBe(true);
+  });
+
+  it('with the audio missing the end edge cannot move past the current end', () => {
+    const { t, id } = clipWithFades(10, 8);
+    registry.update('s1', { status: 'missing', buffer: null });
+    expectNoChange(() =>
+      expect(edit.trimEdge(id, 'end', 19)).toEqual({ ok: false, error: MSG.editOutOfRange }),
+    );
+    expect(edit.trimEdge(id, 'end', 17).ok).toBe(true);
+    expect(numbers(t)).toEqual([[10, 0, 7, 0, 0]]);
+  });
+
+  it('an unknown clip fails', () => {
+    expect(edit.trimEdge('nope', 'end', 1)).toEqual({ ok: false, error: MSG.editNoClip });
+  });
+});
+
+describe('setFades (README §9.5 R2)', () => {
+  it('sets both fades and commits structure once', () => {
+    const { t, id } = clipWithFades(0, 8);
+    expect(edit.setFades(id, 0.5, 1)).toEqual({ ok: true, value: undefined });
+    expect(numbers(t)).toEqual([[0, 0, 8, 0.5, 1]]);
+    expect(commits).toEqual([{ kind: 'structure' }]);
+  });
+
+  it('a + b = d is accepted as is', () => {
+    const { t, id } = clipWithFades(0, 8);
+    expect(edit.setFades(id, 3, 5).ok).toBe(true);
+    expect(numbers(t)).toEqual([[0, 0, 8, 3, 5]]);
+  });
+
+  it('one sample too long is scaled to fit', () => {
+    const { id } = clipWithFades(0, 8);
+    expect(edit.setFades(id, 4, 4 + 1 / 44100).ok).toBe(true);
+    const c = clipById(id)!;
+    expect(c.fadeIn + c.fadeOut).toBeCloseTo(8, 9);
+    expect(c.fadeIn).toBeLessThan(4);
+  });
+
+  it.each([
+    [5, 5, MSG.fadeTooLong],
+    [-1, 0, MSG.fadeInvalid],
+    [0, Number.NaN, MSG.fadeInvalid],
+  ])('(%d, %d) fails with its message and changes nothing', (a, b, message) => {
+    const { id } = clipWithFades(0, 8);
+    expectNoChange(() => expect(edit.setFades(id, a, b)).toEqual({ ok: false, error: message }));
+  });
+
+  it('an unknown clip fails', () => {
+    expect(edit.setFades('nope', 0, 0)).toEqual({ ok: false, error: MSG.editNoClip });
+  });
+});

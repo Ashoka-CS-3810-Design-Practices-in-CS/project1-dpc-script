@@ -1,13 +1,29 @@
-import type { EditService, ProjectStore } from '@/app/contracts';
+import type { ClipLocation, EditService, ProjectStore } from '@/app/contracts';
 import { MSG } from '@/app/messages';
+import {
+  checkFades,
+  deleteRange,
+  splitAt,
+  trimEdge as trimClipEdge,
+  trimToRange,
+  type EdgeContext,
+  type EditOpts,
+} from '@/algorithms/edits';
 import { firstFreeStart } from '@/algorithms/search';
-import type { EditErrorCode } from '@/algorithms/types';
-import { EPSILON, NEW_TRACK_VOLUME } from '@/model/constants';
+import type { ClipLike, EditError, EditErrorCode } from '@/algorithms/types';
+import { EPSILON, MIN_CLIP_LENGTH, NEW_TRACK_VOLUME, SAMPLE_RATE } from '@/model/constants';
 import { newId } from '@/model/ids';
 import { findClip, findTrack, nextTrackName, validateName } from '@/model/projectOps';
 import { done, fail, ok } from '@/model/result';
-import { addTrack, canPlace, insertClip, removeClipAt, removeTrack } from '@/model/trackOps';
-import type { Clip } from '@/model/types';
+import {
+  addTrack,
+  canPlace,
+  insertClip,
+  removeClipAt,
+  removeTrack,
+  replaceClipAt,
+} from '@/model/trackOps';
+import type { Clip, ClipId, Project } from '@/model/types';
 
 const EDIT_MESSAGES: Record<EditErrorCode, string> = {
   'too-short': MSG.editTooShort,
@@ -22,13 +38,46 @@ export function editErrorMessage(code: EditErrorCode): string {
   return EDIT_MESSAGES[code];
 }
 
-function notImplemented(name: keyof EditService): never {
-  throw new Error(`EditService.${name} not implemented yet`);
+/** A5 options for every edit (README §7). */
+export const EDIT_OPTS: EditOpts = {
+  minLength: MIN_CLIP_LENGTH,
+  sampleRate: SAMPLE_RATE,
+  eps: EPSILON,
+};
+
+function isEditError<T extends object>(r: T | EditError): r is EditError {
+  return 'error' in r;
+}
+
+/** Where the clip's edges may go: its neighbours on the track and the length of its audio
+ *  (null while the source isn't ready). */
+export function edgeContext(p: Project, loc: ClipLocation): EdgeContext {
+  const { clips } = loc.track;
+  const prev = clips[loc.clipIndex - 1];
+  const next = clips[loc.clipIndex + 1];
+  const source = p.sources.get(loc.clip.sourceId);
+  return {
+    prevEnd: prev ? prev.startTime + prev.duration : 0,
+    nextStart: next ? next.startTime : Infinity,
+    sourceDuration: source?.status === 'ready' && source.buffer ? source.buffer.duration : null,
+  };
+}
+
+/** A clip of `base`'s source with the numbers of an edit piece. */
+function toClip(base: Clip, piece: ClipLike, id: ClipId): Clip {
+  return {
+    id,
+    sourceId: base.sourceId,
+    startTime: piece.startTime,
+    sourceOffset: piece.sourceOffset,
+    duration: piece.duration,
+    fadeIn: piece.fadeIn,
+    fadeOut: piece.fadeOut,
+  };
 }
 
 /** The only code that changes tracks and clips. Every method validates first, changes the
- *  project only on success, then commits exactly once. Trim, split, region delete and fades:
- *  VR-06. */
+ *  project only on success, then commits exactly once. */
 export function createEditService(store: ProjectStore): EditService {
   return {
     addTrack() {
@@ -130,10 +179,63 @@ export function createEditService(store: ProjectStore): EditService {
       store.commit({ kind: 'structure' });
     },
 
-    trimToSelection: () => notImplemented('trimToSelection'),
-    trimEdge: () => notImplemented('trimEdge'),
-    split: () => notImplemented('split'),
-    deleteRegion: () => notImplemented('deleteRegion'),
-    setFades: () => notImplemented('setFades'),
+    trimToSelection(clipId, start, end) {
+      const loc = findClip(store.get(), clipId);
+      if (!loc) return fail(MSG.editNoClip);
+      const r = trimToRange(loc.clip, start, end, EDIT_OPTS);
+      if (isEditError(r)) return fail(editErrorMessage(r.error));
+      replaceClipAt(loc.track, loc.clipIndex, [toClip(loc.clip, r, loc.clip.id)]);
+      store.commit({ kind: 'structure' });
+      return done();
+    },
+
+    trimEdge(clipId, edge, newTime) {
+      const p = store.get();
+      const loc = findClip(p, clipId);
+      if (!loc) return fail(MSG.editNoClip);
+      const r = trimClipEdge(loc.clip, edge, newTime, edgeContext(p, loc), EDIT_OPTS);
+      if (isEditError(r)) return fail(editErrorMessage(r.error));
+      replaceClipAt(loc.track, loc.clipIndex, [toClip(loc.clip, r, loc.clip.id)]);
+      store.commit({ kind: 'structure' });
+      return done();
+    },
+
+    split(clipId, at) {
+      const p = store.get();
+      const loc = findClip(p, clipId);
+      if (!loc) return fail(MSG.editNoClip);
+      const r = splitAt(loc.clip, at, EDIT_OPTS);
+      if (isEditError(r)) return fail(editErrorMessage(r.error));
+      const left = toClip(loc.clip, r[0], loc.clip.id); // the left piece keeps the original id
+      const right = toClip(loc.clip, r[1], newId());
+      replaceClipAt(loc.track, loc.clipIndex, [left, right]);
+      p.sources.retain(loc.clip.sourceId); // the extra piece holds its own reference
+      store.commit({ kind: 'structure' });
+      return ok<[ClipId, ClipId]>([left.id, right.id]);
+    },
+
+    deleteRegion(clipId, start, end) {
+      const p = store.get();
+      const loc = findClip(p, clipId);
+      if (!loc) return fail(MSG.editNoClip);
+      const r = deleteRange(loc.clip, start, end, EDIT_OPTS);
+      if (isEditError(r)) return fail(editErrorMessage(r.error));
+      const pieces = r.map((piece, i) => toClip(loc.clip, piece, i === 0 ? loc.clip.id : newId()));
+      replaceClipAt(loc.track, loc.clipIndex, pieces);
+      if (pieces.length === 0) p.sources.release(loc.clip.sourceId);
+      if (pieces.length === 2) p.sources.retain(loc.clip.sourceId);
+      store.commit({ kind: 'structure' });
+      return done();
+    },
+
+    setFades(clipId, fadeIn, fadeOut) {
+      const loc = findClip(store.get(), clipId);
+      if (!loc) return fail(MSG.editNoClip);
+      const r = checkFades(fadeIn, fadeOut, loc.clip.duration, EDIT_OPTS);
+      if (isEditError(r)) return fail(editErrorMessage(r.error));
+      replaceClipAt(loc.track, loc.clipIndex, [{ ...loc.clip, ...r }]);
+      store.commit({ kind: 'structure' });
+      return done();
+    },
   };
 }
