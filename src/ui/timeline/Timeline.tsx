@@ -1,11 +1,29 @@
-import { useEffect, useRef, type JSX } from 'react';
+import { useEffect, useRef, type DragEvent, type JSX } from 'react';
+import { MSG } from '@/app/messages';
+import type { Result } from '@/model/result';
 import { EmptyProject } from '@/ui/EmptyProject';
+import { notify } from '@/ui/feedback';
+import { formatDuration } from '@/ui/format';
 import { useProject, useServices, useViewStore } from '@/ui/servicesContext';
 import { TrackHeaders } from '@/ui/tracks/TrackHeaders';
-import { contentHeight } from './geometry';
-import { drawOverlay } from './overlay';
+import { contentHeight, trackIndexAt } from './geometry';
+import {
+  beginGesture,
+  cursorFor,
+  hitTest,
+  type Commit,
+  type Gesture,
+  type GestureStep,
+} from './interactions';
+import { drawOverlay, NO_PREVIEW, type Preview } from './overlay';
 import { attachRedraws, TimelineRenderer, type Palette } from './renderer';
 import './timeline.css';
+
+/** The UI's Result convention (README §8.6): errors and warnings become toasts. */
+function report(r: Result<unknown>): void {
+  if (!r.ok) notify.error(r.error);
+  else r.warnings?.forEach(notify.warning);
+}
 
 /** Pixels per wheel "line" when the browser reports line deltas (Firefox mouse wheels). */
 const WHEEL_LINE_PX = 16;
@@ -58,7 +76,7 @@ export function Timeline(): JSX.Element {
     const overlayCtx = overlay.getContext('2d');
     if (!baseCtx || !overlayCtx) return;
 
-    const { store, queries, transport } = services;
+    const { store, queries, transport, edit } = services;
     const colors = readPalette(root);
     const renderer = new TimelineRenderer(baseCtx, {
       queries,
@@ -77,8 +95,9 @@ export function Timeline(): JSX.Element {
     let size = { width: 0, height: 0 };
     let disposed = false;
     let overlayPending = false;
+    let preview: Preview = NO_PREVIEW;
 
-    // The overlay is redrawn on every change, and every frame while playing.
+    // The overlay is redrawn on every change and pointer move, and every frame while playing.
     function requestOverlay(): void {
       if (overlayPending || disposed) return;
       overlayPending = true;
@@ -89,11 +108,37 @@ export function Timeline(): JSX.Element {
           overlayCtx!,
           size,
           view.get(),
-          { playhead: transport.position(), drag: null },
+          { playhead: transport.position(), ...preview },
           colors,
         );
         if (transport.state() === 'playing') requestOverlay();
       });
+    }
+
+    // Seeking while dragging on the ruler happens at most once per animation frame.
+    let pendingSeek: number | null = null;
+    function requestSeek(t: number): void {
+      if (pendingSeek === null) {
+        requestAnimationFrame(() => {
+          if (!disposed && pendingSeek !== null) transport.seek(pendingSeek);
+          pendingSeek = null;
+        });
+      }
+      pendingSeek = t;
+    }
+
+    function commit(c: Commit): void {
+      if (c.kind === 'move') report(edit.moveClip(c.clipId, c.trackId, c.start));
+      else if (c.kind === 'fades') report(edit.setFades(c.clipId, c.fadeIn, c.fadeOut));
+      else report(edit.trimEdge(c.clipId, c.edge, c.time));
+    }
+
+    function apply(step: GestureStep): void {
+      preview = step.preview;
+      if (step.view) view.set(step.view);
+      if (step.seek !== undefined) requestSeek(step.seek);
+      if (step.commit) commit(step.commit);
+      requestOverlay();
     }
 
     // Both canvases cover the visible width and every row, scaled for sharp high-DPI drawing.
@@ -133,7 +178,69 @@ export function Timeline(): JSX.Element {
     }
     area.addEventListener('wheel', onWheel, { passive: false });
 
+    // Pointer gestures (README §9.5 R10) on the top canvas, with pointer capture so a drag
+    // keeps going outside the canvas.
+    const gestureDeps = {
+      queries,
+      view: () => view.get(),
+      trackIds: () => store.get().tracks.map((t) => t.id),
+      playhead: () => transport.position(),
+    };
+    let gesture: Gesture | null = null;
+
+    function pointAt(e: PointerEvent): [number, number] {
+      const r = overlay!.getBoundingClientRect();
+      return [e.clientX - r.left, e.clientY - r.top];
+    }
+
+    function zoneAt(x: number, y: number) {
+      const trackIds = gestureDeps.trackIds();
+      return hitTest(x, y, { view: view.get(), trackIds, clipAt: queries.clipAt });
+    }
+
+    function onPointerDown(e: PointerEvent): void {
+      if (e.button !== 0 || gesture) return;
+      const [x, y] = pointAt(e);
+      gesture = beginGesture(zoneAt(x, y), x, y, gestureDeps);
+      if (!gesture) return;
+      overlay!.setPointerCapture(e.pointerId);
+      overlay!.style.cursor = cursorFor(gesture.zone, true);
+      apply(gesture.down);
+    }
+
+    function onPointerMove(e: PointerEvent): void {
+      const [x, y] = pointAt(e);
+      if (gesture) apply(gesture.move(x, y));
+      else overlay!.style.cursor = cursorFor(zoneAt(x, y), false);
+    }
+
+    function onPointerUp(e: PointerEvent): void {
+      if (!gesture) return;
+      const [x, y] = pointAt(e);
+      const g = gesture;
+      gesture = null;
+      if (overlay!.hasPointerCapture(e.pointerId)) overlay!.releasePointerCapture(e.pointerId);
+      apply(g.end(x, y));
+      overlay!.style.cursor = cursorFor(zoneAt(x, y), false);
+    }
+
+    function onPointerCancel(): void {
+      if (!gesture) return;
+      const g = gesture;
+      gesture = null;
+      apply(g.cancel());
+    }
+
+    overlay.addEventListener('pointerdown', onPointerDown);
+    overlay.addEventListener('pointermove', onPointerMove);
+    overlay.addEventListener('pointerup', onPointerUp);
+    overlay.addEventListener('pointercancel', onPointerCancel);
+
     return () => {
+      overlay.removeEventListener('pointerdown', onPointerDown);
+      overlay.removeEventListener('pointermove', onPointerMove);
+      overlay.removeEventListener('pointerup', onPointerUp);
+      overlay.removeEventListener('pointercancel', onPointerCancel);
       disposed = true;
       resizeRef.current = null;
       observer.disconnect();
@@ -150,8 +257,39 @@ export function Timeline(): JSX.Element {
     resizeRef.current?.();
   }, [height]);
 
+  function onDragOver(e: DragEvent<HTMLElement>): void {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault(); // allows the drop
+    e.dataTransfer.dropEffect = 'copy';
+  }
+
+  // Dropped files go on the track under the pointer (else the selected track), at the
+  // playhead. One at a time, so each finds the next free position.
+  async function onDrop(e: DragEvent<HTMLElement>): Promise<void> {
+    if (e.dataTransfer.files.length === 0) return;
+    e.preventDefault();
+    const files = [...e.dataTransfer.files];
+    const area = areaRef.current;
+    const { tracks } = services.store.get();
+    const index = area
+      ? trackIndexAt(e.clientY - area.getBoundingClientRect().top, tracks.length)
+      : null;
+    const trackId = index === null ? view.get().selectedTrackId : tracks[index].id;
+    for (const file of files) {
+      const r = await services.importer.importFile(file, trackId, services.transport.position());
+      report(r);
+      if (r.ok) notify.success(MSG.imported(r.value.fileName, formatDuration(r.value.duration)));
+    }
+  }
+
   return (
-    <main aria-label="Timeline" className="timeline" ref={rootRef}>
+    <main
+      aria-label="Timeline"
+      className="timeline"
+      ref={rootRef}
+      onDragOver={onDragOver}
+      onDrop={(e) => void onDrop(e)}
+    >
       {hasTracks ? (
         <div className="timeline-scroll">
           <div className="timeline-content" style={{ height }}>
