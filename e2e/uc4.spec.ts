@@ -104,7 +104,8 @@ for (const [mode, label] of MODES) {
     const download = page.waitForEvent('download');
     await d.press(dialog('Export WAV').getByRole('button', { name: 'Export', exact: true }));
     const file = await download;
-    expect(file.suggestedFilename()).toBe('UC4 Demo.wav');
+    // WebKit saves a name with a space as "UC4_Demo.wav"; the app asks for "UC4 Demo.wav".
+    expect(file.suggestedFilename()).toMatch(/^UC4[ _]Demo\.wav$/);
     const frames = Math.ceil(reopened.end * 44100);
     expect(statSync(await file.path()).size).toBe(44 + 2 * frames * 2); // 16-bit stereo
     await expect(dialog('Export WAV')).toHaveCount(0);

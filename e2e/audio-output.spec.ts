@@ -180,5 +180,9 @@ test('the exported WAV decodes to the rendered preview, within 16-bit rounding',
     loudest = Math.max(loudest, Math.abs(r.rendered[i]));
   }
   expect(loudest).toBeGreaterThan(0.2); // the comparison is not between two silences
-  expect(worst).toBeLessThanOrEqual(1 / 32767);
+  // Rounding to 16 bits costs at most half a step (0.5 / 32767). Our encoder scales positive
+  // samples by 32767, but browsers differ in what they divide by when decoding: some by 32767,
+  // WebKit by 32768, which adds up to x / 32768 more. So the bound that holds for every decoder
+  // is 1.5 / 32768 (about 4.6e-5, still far below anything audible).
+  expect(worst).toBeLessThanOrEqual(1.5 / 32768);
 });
