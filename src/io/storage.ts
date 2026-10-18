@@ -94,7 +94,9 @@ export function createStorage(): StorageAdapter {
 
     getSource: async (id) => (await getDb()).get('sources', id),
 
-    hasSource: async (id) => (await (await getDb()).getKey('sources', id)) !== undefined,
+    // count(), not getKey(): in Chromium getKey on a store of 50 MB values took ~36 ms a lookup,
+    // count() under 1 ms. Opening a project asks once per source (A3 §2.8: open in < 200 ms).
+    hasSource: async (id) => (await (await getDb()).count('sources', id)) > 0,
 
     deleteSource: async (id) => (await getDb()).delete('sources', id),
 

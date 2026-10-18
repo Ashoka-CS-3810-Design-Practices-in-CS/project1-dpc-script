@@ -13,6 +13,9 @@ export interface LiveContext extends AudioContextLike {
 }
 
 export interface PlaybackEngine {
+  /** Creates the audio context ahead of the first Play. The browser's first context takes about
+   *  half a second to start; doing it here keeps that off the Play click. Never throws. */
+  prepare(): void;
   /** Resumes the context, builds the mix from `p` and returns `tc`, the context time of `p`. */
   start(project: Project, p: number): Promise<number>;
   /** Stops and disconnects every player and gain. */
@@ -31,6 +34,7 @@ export function createPlaybackEngine(
 ): PlaybackEngine {
   let ctx: LiveContext | null = null;
   let graph: MixGraph | null = null;
+  let played = false; // a context nobody has played on yet can't have lost its output
   const listeners = new Set<(message: string) => void>();
   // Starts run one after another, so a slow resume can't finish after a later start.
   let queue: Promise<unknown> = Promise.resolve();
@@ -46,6 +50,7 @@ export function createPlaybackEngine(
     created.onstatechange = () => {
       const state = created.state;
       // We never suspend or close the context ourselves, so any of these means the output is gone.
+      if (!played) return;
       if (state === 'interrupted' || state === 'closed' || (state === 'suspended' && graph)) {
         report(`audio context ${state}`);
       }
@@ -72,6 +77,7 @@ export function createPlaybackEngine(
 
   async function startNow(project: Project, p: number): Promise<number> {
     const live = context();
+    played = true;
     await live.resume();
     stopAll();
     const tc = live.currentTime + SCHEDULE_MARGIN_S;
@@ -80,6 +86,14 @@ export function createPlaybackEngine(
   }
 
   return {
+    prepare() {
+      try {
+        context();
+      } catch {
+        // No Web Audio here. Play will say so when it is clicked.
+      }
+    },
+
     start(project, p) {
       const run = queue.then(() => startNow(project, p));
       queue = run.catch(() => {});

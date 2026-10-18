@@ -164,4 +164,39 @@ describe('playback engine', () => {
     ctx.onstatechange?.();
     expect(errors).toEqual([]);
   });
+
+  it('prepare creates the context early, once, and start reuses it', async () => {
+    const { ctx } = fakeLive();
+    const create = vi.fn(() => ctx);
+    const engine = createPlaybackEngine(create, createDefaultEffects());
+    engine.prepare();
+    engine.prepare();
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(ctx.state).toBe('suspended'); // prepared, not resumed: that needs the Play click
+
+    await engine.start(oneClipProject(), 0);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(ctx.state).toBe('running');
+  });
+
+  it('prepare does not throw in a browser without Web Audio, and start then reports it', async () => {
+    const engine = createPlaybackEngine(() => {
+      throw new ReferenceError('AudioContext is not defined');
+    }, createDefaultEffects());
+    expect(() => engine.prepare()).not.toThrow();
+    await expect(engine.start(oneClipProject(), 0)).rejects.toThrow('AudioContext is not defined');
+  });
+
+  it('a prepared context that nobody has played on cannot report a lost output', () => {
+    const { ctx } = fakeLive();
+    const engine = createPlaybackEngine(() => ctx, createDefaultEffects());
+    const errors: string[] = [];
+    engine.onError((m) => errors.push(m));
+    engine.prepare();
+    for (const state of ['interrupted', 'closed']) {
+      ctx.state = state;
+      ctx.onstatechange?.();
+    }
+    expect(errors).toEqual([]);
+  });
 });

@@ -17,6 +17,7 @@ function fakeEngine() {
   let held = false;
   const waiting: Array<() => void> = [];
   const engine: PlaybackEngine = {
+    prepare: () => {},
     start: async (_project, p) => {
       calls.push(`start ${p}`);
       if (rejectNext) {
