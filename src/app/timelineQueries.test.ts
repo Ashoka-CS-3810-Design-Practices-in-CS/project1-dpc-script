@@ -234,4 +234,72 @@ describe('fadeVolume and audibility', () => {
       [B, false],
     ]);
   });
+
+  it('with every track soloed every track is heard, muted or not', () => {
+    edit.toggleMute(A);
+    edit.toggleSolo(A);
+    edit.toggleSolo(B);
+    expect([...q.audibility()]).toEqual([
+      [A, true],
+      [B, true],
+    ]);
+  });
+});
+
+describe('mono and stereo sources in one project', () => {
+  it('both draw waveform columns', () => {
+    const mono = fakeAudioBuffer({ duration: 4, fill: (i) => Math.sin(i / 50) });
+    const stereo = fakeAudioBuffer({
+      duration: 4,
+      channels: 2,
+      fill: (i, ch) => (ch === 0 ? 0.25 : -0.75) * Math.sin(i / 50),
+    });
+    const pyramid = (b: AudioBuffer) =>
+      buildPeaks(
+        Array.from({ length: b.numberOfChannels }, (_, ch) => b.getChannelData(ch)),
+        b.sampleRate,
+        PEAK_BLOCK_SIZE,
+      );
+    registry.update('s1', { peaks: pyramid(mono) });
+    registry.update('s2', { peaks: pyramid(stereo) });
+
+    const monoCols = q.waveformColumns(clip(a1), 100, 0, 10)!;
+    const stereoCols = q.waveformColumns(clip(b2s), 100, 0, 10)!;
+    expect(monoCols).toHaveLength(20);
+    expect(stereoCols).toHaveLength(20);
+    // Stereo columns span both channels: up to 0.75 in each direction.
+    expect(Math.max(...stereoCols)).toBeCloseTo(0.75, 2);
+    expect(Math.min(...stereoCols)).toBeCloseTo(-0.75, 2);
+  });
+});
+
+describe('A3 Table 1: project size (16 tracks × 50 clips)', () => {
+  it('stays usable in EditService and the queries', () => {
+    const ids: TrackId[] = [];
+    for (let i = 0; i < 16; i++) {
+      const t = i < 2 ? [A, B][i] : edit.addTrack();
+      ids.push(t);
+      // 50 clips of 1 s with 1 s gaps, added out of order (k · 7 mod 50 visits every k).
+      for (let k = 0; k < 50; k++) place(t, 's1', 100 + 2 * ((k * 7) % 50), 1);
+    }
+    const tracks = q.audibility().size;
+    expect(tracks).toBe(16);
+
+    for (const t of ids) {
+      const clips = q.visibleClips(t, 100, 300);
+      expect(clips).toHaveLength(50);
+      expect(clips.map((c) => c.startTime)).toEqual(
+        Array.from({ length: 50 }, (_, k) => 100 + 2 * k),
+      );
+      expect(q.clipAt(t, 150.5)?.startTime).toBe(150);
+      expect(q.clipAt(t, 151.5)).toBeNull();
+    }
+
+    // A drag over the full project: the clip fits a gap exactly and snaps into it.
+    const last = q.visibleClips(ids[15], 198, 199)[0];
+    const preview = q.beginDrag(last.id, 0).update(101.02, ids[0], 100, true);
+    expect(preview).toMatchObject({ start: 101, valid: true });
+    expect(edit.moveClip(last.id, ids[0], preview.start).ok).toBe(true);
+    expect(q.projectEnd()).toBe(199);
+  });
 });
