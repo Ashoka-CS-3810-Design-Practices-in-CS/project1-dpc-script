@@ -1,11 +1,12 @@
 import { useEffect, useRef, type DragEvent, type JSX } from 'react';
 import { MSG } from '@/app/messages';
-import type { Result } from '@/model/result';
 import { EmptyProject } from '@/ui/EmptyProject';
 import { notify } from '@/ui/feedback';
 import { formatDuration } from '@/ui/format';
 import { useProject, useServices, useViewStore } from '@/ui/servicesContext';
+import { report } from '@/ui/shortcuts';
 import { TrackHeaders } from '@/ui/tracks/TrackHeaders';
+import { ClipButtons, RulerSlider } from './accessible';
 import { contentHeight, trackIndexAt } from './geometry';
 import {
   beginGesture,
@@ -18,12 +19,6 @@ import {
 import { drawOverlay, NO_PREVIEW, type Preview } from './overlay';
 import { attachRedraws, TimelineRenderer, type Palette } from './renderer';
 import './timeline.css';
-
-/** The UI's Result convention (README §8.6): errors and warnings become toasts. */
-function report(r: Result<unknown>): void {
-  if (!r.ok) notify.error(r.error);
-  else r.warnings?.forEach(notify.warning);
-}
 
 /** Pixels per wheel "line" when the browser reports line deltas (Firefox mouse wheels). */
 const WHEEL_LINE_PX = 16;
@@ -297,8 +292,10 @@ export function Timeline(): JSX.Element {
             <div className="timeline-canvas-area" ref={areaRef}>
               <canvas ref={baseRef} aria-hidden="true" />
               <canvas ref={overlayRef} aria-hidden="true" />
+              <RulerSlider />
             </div>
           </div>
+          <ClipButtons />
         </div>
       ) : (
         <EmptyProject />
