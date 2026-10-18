@@ -37,6 +37,11 @@ export function createServices(): Services {
   // The browser's audio classes have the shape the engine uses, but TypeScript can't see it.
   const engine = createPlaybackEngine(() => createLiveContext() as unknown as LiveContext, effects);
 
+  // The browser's first AudioContext takes about half a second to start. Do that while the page
+  // is idle instead of on the first Play click, which has to schedule within 100 ms (A3 §2.8).
+  const whenIdle = 'requestIdleCallback' in window ? window.requestIdleCallback : setTimeout;
+  whenIdle(() => engine.prepare());
+
   const services: Services = {
     store,
     edit,
