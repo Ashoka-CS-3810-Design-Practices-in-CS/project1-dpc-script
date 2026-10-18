@@ -292,7 +292,7 @@ export function Timeline(): JSX.Element {
     >
       {hasTracks ? (
         <div className="timeline-scroll">
-          <div className="timeline-content" style={{ height }}>
+          <div className="timeline-content" style={{ minHeight: height }}>
             <TrackHeaders />
             <div className="timeline-canvas-area" ref={areaRef}>
               <canvas ref={baseRef} aria-hidden="true" />
