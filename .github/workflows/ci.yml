@@ -28,6 +28,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps
+      # The runner has no sound card. Without one Firefox never starts its audio, so playback
+      # sits at 0 s (Chromium and WebKit fake it). A PulseAudio null sink is a virtual sound card.
+      - name: Start a virtual sound card
+        run: |
+          sudo apt-get install -y pulseaudio
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=ci_sink
+          pactl set-default-sink ci_sink
       - run: npm run fixtures
       - run: npm run e2e
       - uses: actions/upload-artifact@v4
