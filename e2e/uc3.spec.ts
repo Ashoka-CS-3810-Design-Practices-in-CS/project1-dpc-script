@@ -95,12 +95,12 @@ for (const [mode, label] of MODES) {
     await expect(mute('Narration')).toHaveAttribute('aria-pressed', 'true');
     expect(await transportState(page)).toBe('playing');
 
-    // Pause, then Stop (Home) puts the playhead back at 0.
+    // Pause, then Stop (Esc) puts the playhead back at 0.
     if (mode === 'keyboard') await page.keyboard.press('Space');
     else await page.getByRole('button', { name: 'Pause', exact: true }).click();
     await expect(playButton).toBeVisible();
     expect(await transportState(page)).toBe('paused');
-    if (mode === 'keyboard') await page.keyboard.press('Home');
+    if (mode === 'keyboard') await page.keyboard.press('Escape');
     else await page.getByRole('button', { name: 'Stop', exact: true }).click();
     await expect.poll(() => transportState(page)).toBe('stopped');
     expect(await transportPosition(page)).toBe(0);

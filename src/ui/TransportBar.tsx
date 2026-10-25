@@ -62,11 +62,11 @@ export function TransportBar(): JSX.Element {
       <button
         type="button"
         aria-label="Stop"
-        aria-keyshortcuts="Home"
-        title="Stop and go back to the start (Home)"
+        aria-keyshortcuts="Escape"
+        title="Stop and go back to the start (Esc)"
         onClick={() => transport.stop()}
       >
-        Stop <Kbd keys="Home" />
+        Stop <Kbd keys="Esc" />
       </button>
       <output className="clock" aria-live="off" aria-label="Playhead time">
         {clock}

@@ -58,7 +58,7 @@ function keyToAction(e: KeyLike, context: KeyContext): ShortcutAction | null {
   switch (e.key) {
     case ' ':
       return { type: 'togglePlay' };
-    case 'Home':
+    case 'Escape':
       return { type: 'stop' };
     case 'Delete':
       return { type: 'deleteSelection' };
@@ -224,6 +224,8 @@ export function useShortcuts(): void {
     function onKeyDown(e: KeyboardEvent): void {
       const action = keyToAction(e, { inField: isFieldTarget(e.target) });
       if (!action) return;
+      // Escape closes a dialog; it must not also stop playback.
+      if (e.key === 'Escape' && document.querySelector('dialog[open]')) return;
       // Keep Space from also clicking a focused button, arrows from scrolling, Ctrl+S from
       // saving the page.
       e.preventDefault();

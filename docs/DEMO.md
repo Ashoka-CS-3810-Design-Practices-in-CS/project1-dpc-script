@@ -19,7 +19,7 @@ current Chromium, Firefox or Safari window at least 1280 px wide.
    playhead with its waveform.
 3. Select the second track and import `music-stereo.wav`. Or drag the file straight onto the
    track.
-4. Press **Space** to play and **Space** again to pause. **Home** stops and returns to 0.
+4. Press **Space** to play and **Space** again to pause. **Esc** stops and returns to 0.
 5. Drag the music clip sideways. It clicks to clip edges and the playhead; a
    clip can never overlap its neighbour.
 
@@ -58,7 +58,7 @@ clip list (Tab to a clip, Enter selects it), the **Playhead position** slider (â
 | Key           | Action                         |
 | ------------- | ------------------------------ |
 | Space         | Play / pause                   |
-| Home          | Stop, back to 0                |
+| Esc           | Stop, back to 0                |
 | S             | Split at the playhead          |
 | T             | Trim to selection              |
 | Delete        | Delete selection               |

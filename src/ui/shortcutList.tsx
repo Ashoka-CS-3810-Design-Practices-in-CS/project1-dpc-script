@@ -10,7 +10,7 @@ export const SHORTCUT_GROUPS: { title: string; items: { keys: string; does: stri
     title: 'Playback',
     items: [
       { keys: 'Space', does: 'Play / pause' },
-      { keys: 'Home', does: 'Stop and go back to the start' },
+      { keys: 'Esc', does: 'Stop and go back to the start' },
       { keys: '← / →', does: 'Move the selected clip, or the playhead on the ruler, by 10 ms' },
       { keys: 'Shift + ← / →', does: 'The same, by 1 s' },
     ],
