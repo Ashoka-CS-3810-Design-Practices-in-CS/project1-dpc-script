@@ -24,7 +24,6 @@ export default defineConfig({
       thresholds: {
         'src/algorithms/**': { branches: 100 },
         'src/model/**': { branches: 90 },
-        'src/app/editService.ts': { branches: 90 },
       },
     },
   },

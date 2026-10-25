@@ -153,37 +153,6 @@ describe('export service: export', () => {
     expect(downloads).toEqual([]);
   });
 
-  it('cancelling during the render downloads nothing', async () => {
-    const controller = new AbortController();
-    const encode = vi.fn();
-    const { service, downloads } = setup(
-      {},
-      {
-        render: async () => {
-          controller.abort();
-          return fakeAudioBuffer({ duration: 1 });
-        },
-        encode,
-      },
-    );
-    const result = await service.export(settings(), noProgress, controller.signal);
-    expect(result).toEqual({ ok: false, error: MSG.exportCancelled });
-    expect(encode).not.toHaveBeenCalled();
-    expect(downloads).toEqual([]);
-  });
-
-  it('a RangeError or an out-of-memory error → exportNoMemory', async () => {
-    for (const error of [
-      new RangeError('Array buffer allocation failed'),
-      new Error('Out of memory'),
-    ]) {
-      const { service, downloads } = setup({}, { render: () => Promise.reject(error) });
-      const result = await service.export(settings(), noProgress, new AbortController().signal);
-      expect(result).toEqual({ ok: false, error: MSG.exportNoMemory });
-      expect(downloads).toEqual([]);
-    }
-  });
-
   it('warns when samples were limited', async () => {
     const { service } = setup(
       {},

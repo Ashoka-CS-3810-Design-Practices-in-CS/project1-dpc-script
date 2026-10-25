@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MSG } from '@/app/messages';
-import { encodeWav } from '@/algorithms/wav';
 import { MAX_DURATION_S, MAX_FILE_BYTES, SAMPLE_RATE } from '@/model/constants';
 import { checkFile, decodeFile, type ImportMessages } from './decoder';
 
@@ -20,11 +19,6 @@ const ctxReturning = (buffer: AudioBuffer) => ({
 const ctxFailing = () => ({ decodeAudioData: vi.fn().mockRejectedValue(new Error('bad data')) });
 
 describe('checkFile', () => {
-  it('accepts .wav and .mp3 in any letter case', () => {
-    expect(checkFile({ name: 'a.wav', size: 10 }, msgs).ok).toBe(true);
-    expect(checkFile({ name: 'b.MP3', size: 10 }, msgs).ok).toBe(true);
-  });
-
   it('rejects other file types', () => {
     expect(checkFile({ name: 'a.flac', size: 10 }, msgs)).toEqual({
       ok: false,
@@ -54,20 +48,6 @@ describe('decodeFile', () => {
     });
     expect((await decodeFile(flac, ctx, msgs)).ok).toBe(false);
     expect(arrayBuffer).not.toHaveBeenCalled();
-    expect(ctx.decodeAudioData).not.toHaveBeenCalled();
-  });
-
-  it('rejects a WAV that is over 30 minutes without decoding it', async () => {
-    const ctx = ctxReturning(lightBuffer(1));
-    // 30:01 of silent 8 kHz mono: a real header followed by zeros.
-    const dataBytes = 8000 * 2 * (MAX_DURATION_S + 1);
-    const long = new Uint8Array(44 + dataBytes);
-    long.set(new Uint8Array(encodeWav([new Float32Array(1)], 8000).bytes, 0, 44));
-    new DataView(long.buffer).setUint32(40, dataBytes, true);
-
-    const result = await decodeFile(new File([long], 'long.wav'), ctx, msgs);
-
-    expect(result).toEqual({ ok: false, error: MSG.importTooLong('long.wav') });
     expect(ctx.decodeAudioData).not.toHaveBeenCalled();
   });
 

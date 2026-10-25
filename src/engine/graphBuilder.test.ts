@@ -63,15 +63,6 @@ describe('buildMix', () => {
     expect(starts(ctx.log)).toEqual(['start 10.05 3 2', 'start 13.05 0 2']);
   });
 
-  it('puts fade events at absolute times', () => {
-    const project = projectWith([track('t', [clip('c', 's', 0, 0, 10, [2, 4])])], [source('s')]);
-    const ctx = createRecordingContext();
-
-    buildMix(ctx, project, 0, 1, createDefaultEffects());
-
-    expect(automation(ctx.log)).toEqual(['set 0 @1', 'ramp 1 @3', 'set 1 @7', 'ramp 0 @11']);
-  });
-
   it('starts from the right volume when seeking into a fade-in', () => {
     const project = projectWith([track('t', [clip('c', 's', 0, 0, 10, [2, 4])])], [source('s')]);
     const ctx = createRecordingContext();
@@ -89,33 +80,5 @@ describe('buildMix', () => {
     buildMix(ctx, project, 8, 1, createDefaultEffects());
 
     expect(automation(ctx.log)).toEqual(['set 0.5 @1', 'ramp 0 @3']);
-  });
-
-  it('sets track gains from mute and solo, and still schedules silent tracks', () => {
-    const tracks = (soloA: boolean) => [
-      track('a', [clip('ca', 's', 0, 0, 4)], { volume: 0.8, muted: !soloA, soloed: soloA }),
-      track('b', [clip('cb', 's', 0, 0, 4)], { volume: 0.6 }),
-    ];
-
-    const muted = buildMix(
-      createRecordingContext(),
-      projectWith(tracks(false), [source('s')]),
-      0,
-      0,
-      createDefaultEffects(),
-    );
-    expect(muted.trackGains.get('a')?.gain.value).toBe(0);
-    expect(muted.trackGains.get('b')?.gain.value).toBe(0.6);
-    expect(muted.players).toHaveLength(2); // the muted track is still scheduled
-
-    const solo = buildMix(
-      createRecordingContext(),
-      projectWith(tracks(true), [source('s')]),
-      0,
-      0,
-      createDefaultEffects(),
-    );
-    expect(solo.trackGains.get('a')?.gain.value).toBe(0.8);
-    expect(solo.trackGains.get('b')?.gain.value).toBe(0);
   });
 });

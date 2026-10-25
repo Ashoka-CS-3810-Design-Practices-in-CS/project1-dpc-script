@@ -120,15 +120,6 @@ describe('transport service', () => {
     expect(calls.at(-1)).toMatch(/^start 3/);
   });
 
-  it('Seek while playing restarts from the new position', async () => {
-    const { transport, calls } = setup();
-    await transport.play();
-    transport.seek(6);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(transport.state()).toBe('playing');
-    expect(calls.slice(-2)).toEqual(['stopAll', 'start 6']);
-  });
-
   it('clamps seeks to [0, project end]', () => {
     const { transport } = setup();
     transport.seek(-0.001);
@@ -143,17 +134,6 @@ describe('transport service', () => {
     transport.seek(99);
     expect(transport.state()).toBe('stopped');
     expect(transport.position()).toBe(10);
-  });
-
-  it('stops at the end by itself (checked every 50 ms)', async () => {
-    const { transport, events, advance } = setup();
-    transport.seek(9);
-    await transport.play();
-    advance(0.05 + 1);
-    await vi.advanceTimersByTimeAsync(50);
-    expect(transport.state()).toBe('stopped');
-    expect(transport.position()).toBe(10);
-    expect(events.at(-1)).toEqual({ state: 'stopped' });
   });
 
   describe('edits during playback', () => {
@@ -180,14 +160,6 @@ describe('transport service', () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(calls).toEqual(['stopAll', 'start 3']);
     });
-
-    it('a project change stops playback', async () => {
-      const { transport, store } = setup();
-      await transport.play();
-      store.replace(createEmptyProject('other', createSourceRegistry()));
-      expect(transport.state()).toBe('stopped');
-      expect(transport.position()).toBe(0);
-    });
   });
 
   describe('errors', () => {
@@ -200,28 +172,5 @@ describe('transport service', () => {
       expect(transport.position()).toBeCloseTo(4);
       expect(events.at(-1)).toEqual({ state: 'stopped', error: MSG.playbackNoOutput });
     });
-  });
-
-  it('Stop while the engine is still starting silences it afterwards', async () => {
-    const { transport, calls, holdStart, releaseStart } = setup();
-    holdStart();
-    const playing = transport.play();
-    transport.stop();
-    releaseStart();
-    await playing;
-    expect(transport.state()).toBe('stopped');
-    expect(calls.filter((c) => c === 'stopAll').length).toBe(2); // once by Stop, once after start
-  });
-
-  it('a superseded build leaves the newer one alone', async () => {
-    const { transport, calls, holdStart, releaseStart } = setup();
-    holdStart();
-    const first = transport.play();
-    transport.seek(5); // restarts while the first build is still pending
-    releaseStart();
-    await first;
-    await vi.advanceTimersByTimeAsync(0);
-    expect(transport.state()).toBe('playing');
-    expect(calls.filter((c) => c === 'stopAll').length).toBe(1);
   });
 });

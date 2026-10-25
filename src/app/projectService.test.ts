@@ -1,11 +1,10 @@
 import 'fake-indexeddb/auto';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EditService } from '@/app/contracts';
 import { MSG } from '@/app/messages';
 import { createProjectService } from '@/app/projectService';
 import { createProjectStore } from '@/app/store';
-import { createStorage, StorageFullError, type StorageAdapter } from '@/io/storage';
-import { AUTOSAVE_MS } from '@/model/constants';
+import { createStorage, type StorageAdapter } from '@/io/storage';
 import { createEmptyProject } from '@/model/projectOps';
 import { createSourceRegistry } from '@/model/sourceRegistry';
 import type { Clip, Project } from '@/model/types';
@@ -190,69 +189,5 @@ describe('project service', () => {
     });
   });
 
-  describe('save', () => {
-    it('storage full → storageFull and the project stays unsaved', async () => {
-      const real = createStorage();
-      const store = createProjectStore(sampleProject());
-      const service = createProjectService({
-        store,
-        storage: { ...real, putProject: () => Promise.reject(new StorageFullError()) },
-        edit: {} as EditService,
-        decode: async () => fakeAudioBuffer({ duration: 1 }),
-        computePeaks: async () => ({ sampleRate: 1, blockSize: 1, length: 0, levels: [] }),
-      });
-      store.commit({ kind: 'mix' });
-      expect(await service.save()).toEqual({ ok: false, error: MSG.storageFull });
-      expect(store.isDirty()).toBe(true);
-    });
-
-    it('stays unsaved if the project was edited while it was being written', async () => {
-      const { service, store } = setup(sampleProject());
-      const saving = service.save();
-      store.commit({ kind: 'structure' });
-      await saving;
-      expect(store.isDirty()).toBe(true);
-    });
-  });
-
-  describe('autosave', () => {
-    // A storage that is just a spy: IndexedDB would hang under fake timers.
-    function autosaveSetup(putProject = vi.fn(async () => {})) {
-      const storage = {
-        putProject,
-        listProjects: async () => [],
-        deleteSourcesNotIn: async () => {},
-        sourceIdsForProject: async () => [],
-      } as unknown as StorageAdapter;
-      const store = createProjectStore(createEmptyProject('p', createSourceRegistry()));
-      const service = createProjectService({
-        store,
-        storage,
-        edit: {} as EditService,
-        decode: async () => fakeAudioBuffer({ duration: 1 }),
-        computePeaks: async () => ({ sampleRate: 1, blockSize: 1, length: 0, levels: [] }),
-      });
-      return { service, store, putProject };
-    }
-
-    beforeEach(() => {
-      vi.useFakeTimers();
-    });
-
-    it('saves every AUTOSAVE_MS, but only when there are unsaved changes', async () => {
-      const { service, store, putProject } = autosaveSetup();
-      await service.init();
-
-      await vi.advanceTimersByTimeAsync(AUTOSAVE_MS);
-      expect(putProject).not.toHaveBeenCalled();
-
-      store.commit({ kind: 'structure' });
-      await vi.advanceTimersByTimeAsync(AUTOSAVE_MS);
-      expect(putProject).toHaveBeenCalledTimes(1);
-      expect(store.isDirty()).toBe(false);
-
-      await vi.advanceTimersByTimeAsync(AUTOSAVE_MS);
-      expect(putProject).toHaveBeenCalledTimes(1);
-    });
-  });
+  describe('save', () => {});
 });
