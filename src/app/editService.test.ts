@@ -4,6 +4,7 @@ import { createEditService } from '@/app/editService';
 import { MSG } from '@/app/messages';
 import { createProjectStore } from '@/app/store';
 import { createEmptyProject } from '@/model/projectOps';
+import { NEW_TRACK_VOLUME } from '@/model/constants';
 import { createSourceRegistry } from '@/model/sourceRegistry';
 import type { SourceRegistry, TrackId } from '@/model/types';
 import { fakeAudioBuffer } from '@/test/fakeAudioBuffer';
@@ -187,5 +188,65 @@ describe('edge cases', () => {
     expect(edit.split(stereo, 5).ok).toBe(true);
     expect(edit.split(mono, 1).ok).toBe(true);
     expect([refCount('s1'), refCount('stereo')]).toEqual([2, 2]);
+  });
+});
+
+describe('undo and redo', () => {
+  it('reverts a split and a clip removal (bringing the audio back), and redo reapplies them', () => {
+    const { t, id } = clipWithFades(0, 8);
+    edit = createEditService(store); // a fresh history: setting up the clip was not a step
+    expect(edit.canUndo()).toBe(false);
+    expect(edit.undo()).toEqual({ ok: false, error: MSG.nothingToUndo });
+
+    expect(edit.split(id, 4).ok).toBe(true);
+    edit.removeClip(id);
+    expect(spans(t)).toEqual([[4, 4]]);
+
+    edit.undo(); // the removed clip is back, its source retained again
+    expect(spans(t)).toEqual([
+      [0, 4],
+      [4, 4],
+    ]);
+    expect(refCount('s1')).toBe(2);
+    edit.undo(); // the split is gone and the audio is in one piece again
+    expect(spans(t)).toEqual([[0, 8]]);
+    expect(refCount('s1')).toBe(1);
+
+    expect(edit.redo().ok).toBe(true);
+    expect(spans(t)).toEqual([
+      [0, 4],
+      [4, 4],
+    ]);
+    edit.setVolume(t, 0.2);
+    expect(edit.canRedo()).toBe(false); // a new edit clears the redo list
+  });
+
+  it('a failed edit is not a step, and a volume drag is one step', () => {
+    const t = edit.addTrack();
+    expect(edit.renameTrack(t, '').ok).toBe(false);
+    edit.setVolume(t, 0.5);
+    edit.setVolume(t, 0.4);
+    edit.setVolume(t, 0.3);
+    edit.undo(); // the whole drag
+    expect(track(t).volume).toBe(NEW_TRACK_VOLUME);
+    edit.undo(); // addTrack
+    expect(store.get().tracks).toHaveLength(0);
+    expect(edit.canUndo()).toBe(false);
+  });
+
+  it('deleting every track (Reset) is one edit and one undo step', () => {
+    const { t } = clipWithFades(0, 4);
+    place(edit.addTrack(), 's2', 0, 2);
+    edit = createEditService(store); // a fresh history
+    commits.length = 0;
+    edit.deleteAllTracks();
+    expect(store.get().tracks).toHaveLength(0);
+    expect(commits).toHaveLength(1);
+    expect([refCount('s1'), refCount('s2')]).toEqual([0, 0]);
+    edit.undo();
+    expect(store.get().tracks).toHaveLength(2);
+    expect(spans(t)).toEqual([[0, 4]]);
+    expect([refCount('s1'), refCount('s2')]).toEqual([1, 1]);
+    expect(edit.canUndo()).toBe(false); // that was the only step
   });
 });

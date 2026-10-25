@@ -6,8 +6,10 @@ import { confirmDialog, notify } from '@/ui/feedback';
 import { formatDb } from '@/ui/format';
 import { useServices, useViewStore } from '@/ui/servicesContext';
 
-export interface TrackHeaderProps {
+interface TrackHeaderProps {
   track: Track;
+  /** The colour of this track's clips, shown as a stripe on the header. */
+  color: string;
   selected: boolean;
   /** Another track is soloed, so this one can't be heard: the header is greyed out. */
   silencedBySolo: boolean;
@@ -19,6 +21,7 @@ export interface TrackHeaderProps {
  *  selects the track. */
 export function TrackHeader({
   track,
+  color,
   selected,
   silencedBySolo,
   editing,
@@ -39,7 +42,7 @@ export function TrackHeader({
   return (
     <div
       className={classes.join(' ')}
-      style={{ height: TRACK_HEIGHT_PX }}
+      style={{ height: TRACK_HEIGHT_PX, borderLeft: `6px solid ${color}` }}
       role="group"
       aria-label={`Track ${track.name}`}
       onClick={() => view.set({ selectedTrackId: track.id })}
@@ -80,6 +83,8 @@ export function TrackHeader({
           type="button"
           className="track-toggle track-mute"
           aria-label="Mute"
+          title="Mute this track (M)"
+          aria-keyshortcuts="M"
           aria-pressed={track.muted}
           onClick={() => edit.toggleMute(track.id)}
         >
@@ -89,6 +94,8 @@ export function TrackHeader({
           type="button"
           className="track-toggle track-solo"
           aria-label="Solo"
+          title="Solo this track (O)"
+          aria-keyshortcuts="O"
           aria-pressed={track.soloed}
           onClick={() => edit.toggleSolo(track.id)}
         >

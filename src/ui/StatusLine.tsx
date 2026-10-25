@@ -1,5 +1,6 @@
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, useRef, useState, type JSX } from 'react';
 import { MSG } from '@/app/messages';
+import { notify } from '@/ui/feedback';
 import { formatClock } from '@/ui/format';
 import { useProject, useServices } from '@/ui/servicesContext';
 
@@ -10,10 +11,23 @@ export function StatusLine(): JSX.Element {
 
   // An autosave that failed. It goes away by itself once a save works (savedAt changes).
   const [autosaveError, setAutosaveError] = useState<{ message: string; savedAt: number | null }>();
-  useEffect(
-    () => projects.onError((message) => setAutosaveError({ message, savedAt: store.savedAt() })),
-    [projects, store],
-  );
+  // It also pops up as a toast, once per kind of failure until a save works again (autosave
+  // retries every 30 s, and errors stay until closed).
+  const lastToast = useRef<string | null>(null);
+  useEffect(() => {
+    const offError = projects.onError((message) => {
+      setAutosaveError({ message, savedAt: store.savedAt() });
+      if (message !== lastToast.current) notify.error(message);
+      lastToast.current = message;
+    });
+    const offSaved = store.subscribe((c) => {
+      if (c.kind === 'saved') lastToast.current = null;
+    });
+    return () => {
+      offError();
+      offSaved();
+    };
+  }, [projects, store]);
 
   const savedAt = store.savedAt();
   let text = '';

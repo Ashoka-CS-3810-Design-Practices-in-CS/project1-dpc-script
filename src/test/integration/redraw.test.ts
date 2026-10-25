@@ -27,12 +27,11 @@ const colors = Object.fromEntries(
     'selection',
     'invalid',
     'rowSelected',
-    'clipBg',
-    'clipHeader',
-    'waveform',
+    'signal',
     'fadeShade',
   ].map((k) => [k, k]),
 ) as unknown as Palette;
+Object.assign(colors, { bg: '#ffffff', fg: '#000000', tracks: ['#1f6f78', '#e8572b'] });
 
 let registry: SourceRegistry;
 let store: ProjectStore;

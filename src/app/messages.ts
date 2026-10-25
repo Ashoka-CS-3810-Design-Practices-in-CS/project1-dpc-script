@@ -7,6 +7,12 @@ export const MSG = {
   importTooLong: (name: string) => `${name} is longer than 30 minutes.`, // †
   importNoTrack: 'Select or add a track first.', // †
   imported: (name: string, duration: string) => `Imported ${name} (${duration})`, // †
+  // undo / redo
+  nothingToUndo: 'Nothing to undo.',
+  nothingToRedo: 'Nothing to redo.',
+  // anything we did not expect
+  unexpectedError: (reason: string) =>
+    `Something went wrong: ${reason}. Try again, and save your work if it keeps happening.`,
   // editing
   editTooShort: 'Each part must be at least 50 ms.', // †
   editOutsideClip: 'Select a region inside the clip.',

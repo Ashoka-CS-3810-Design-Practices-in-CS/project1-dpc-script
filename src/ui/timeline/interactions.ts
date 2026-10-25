@@ -16,7 +16,7 @@ import { NO_PREVIEW, type Preview } from './overlay';
  *  applies. x and y are relative to the canvas (y = 0 is the top of the ruler). */
 
 /** README §9.5 R10: what a press at a point would do. */
-export type Zone =
+type Zone =
   | { kind: 'ruler' } // seek
   | { kind: 'row'; trackIndex: number } // empty part of a row: select the track
   | { kind: 'outside' } // below the last row
@@ -25,7 +25,7 @@ export type Zone =
   | { kind: 'move'; clip: Clip; trackIndex: number } // the top strip with the file name
   | { kind: 'body'; clip: Clip; trackIndex: number }; // the waveform: region select
 
-export interface HitContext {
+interface HitContext {
   view: Viewport;
   trackIds: readonly TrackId[];
   clipAt: (trackId: TrackId, t: Seconds) => Clip | null;
@@ -98,7 +98,7 @@ export interface Gesture {
   cancel(): GestureStep;
 }
 
-export interface GestureDeps {
+interface GestureDeps {
   queries: TimelineQueries;
   view: () => ViewState;
   trackIds: () => readonly TrackId[];
@@ -106,7 +106,7 @@ export interface GestureDeps {
 }
 
 /** A press closer than this to where it started is a click, not a drag. */
-export const DRAG_THRESHOLD_PX = 3;
+const DRAG_THRESHOLD_PX = 3;
 
 const NOTHING: GestureStep = { preview: NO_PREVIEW };
 
@@ -181,7 +181,6 @@ export function beginGesture(
         timeAt(x) - grab,
         index === null ? null : ids[index],
         view.pxPerSecond,
-        view.snapEnabled,
       );
       last = drop;
       return {

@@ -29,7 +29,7 @@ function readTag(view: DataView, offset: number): string {
 }
 
 /** Length of a WAV file in seconds, worked out from its header alone. null if it can't be read. */
-export function wavDurationFromHeader(bytes: ArrayBuffer): number | null {
+function wavDurationFromHeader(bytes: ArrayBuffer): number | null {
   const view = new DataView(bytes);
   if (view.byteLength < 12 || readTag(view, 0) !== 'RIFF' || readTag(view, 8) !== 'WAVE') {
     return null;

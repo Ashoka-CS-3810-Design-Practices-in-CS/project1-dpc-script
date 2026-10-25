@@ -34,7 +34,7 @@ export function findClip(p: Project, id: ClipId): ClipLocation | null {
 
 /** Why a track or project name is invalid; the app layer maps it to MSG.nameEmpty /
  *  MSG.nameTooLong (model may not import app, README §5.2). */
-export type NameError = 'empty' | 'too-long';
+type NameError = 'empty' | 'too-long';
 
 /** null if `name` is valid: 1–MAX_NAME_LENGTH characters and not all spaces. */
 export function validateName(name: string): NameError | null {

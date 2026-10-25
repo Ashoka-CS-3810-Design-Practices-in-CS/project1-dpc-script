@@ -4,9 +4,11 @@ import { MSG } from '@/app/messages';
 import { confirmDialog, notify } from '@/ui/feedback';
 import { formatClock, formatDuration } from '@/ui/format';
 import { useServices } from '@/ui/servicesContext';
+import { report } from '@/ui/shortcuts';
+import { useModalDialog } from '@/ui/useModalDialog';
 import './openProjectDialog.css';
 
-export interface OpenProjectDialogProps {
+interface OpenProjectDialogProps {
   open: boolean;
   onClose: () => void;
 }
@@ -23,7 +25,7 @@ function lastChanged(epochMs: number): string {
 
 function ProjectList({ onClose }: { onClose: () => void }): JSX.Element {
   const { projects, store } = useServices();
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const dialogRef = useModalDialog();
   const firstOpenRef = useRef<HTMLButtonElement>(null);
   const [list, setList] = useState<ProjectSummary[] | null>(null); // null while loading
   const [busy, setBusy] = useState(false);
@@ -32,8 +34,6 @@ function ProjectList({ onClose }: { onClose: () => void }): JSX.Element {
   const load = useCallback(() => projects.list().catch((): ProjectSummary[] => []), [projects]);
 
   useEffect(() => {
-    const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
     let live = true;
     void load().then((summaries) => {
       if (live) setList(summaries);
@@ -53,12 +53,8 @@ function ProjectList({ onClose }: { onClose: () => void }): JSX.Element {
     setBusy(true);
     const r = await projects.open(id);
     setBusy(false);
-    if (!r.ok) {
-      notify.error(r.error);
-      return;
-    }
-    r.warnings?.forEach(notify.warning);
-    onClose();
+    report(r);
+    if (r.ok) onClose();
   }
 
   async function removeProject(p: ProjectSummary): Promise<void> {
@@ -73,7 +69,7 @@ function ProjectList({ onClose }: { onClose: () => void }): JSX.Element {
   return (
     <dialog
       ref={dialogRef}
-      className="open-dialog"
+      className="modal open-dialog"
       aria-labelledby="open-title"
       onCancel={(e) => {
         e.preventDefault(); // Esc closes through onClose, so React stays in charge

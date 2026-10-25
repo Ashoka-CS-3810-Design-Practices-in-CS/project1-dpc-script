@@ -7,7 +7,7 @@ import { useProject, useServices, useViewStore } from '@/ui/servicesContext';
 /** README §9.5 R13: keyboard paths for what the canvas does with the mouse. */
 
 /** "Clip voice.wav on Narration, starts 00:03.000, 42.500 s". */
-export function clipLabel(clip: Clip, track: Track, fileName: string): string {
+function clipLabel(clip: Clip, track: Track, fileName: string): string {
   return `Clip ${fileName} on ${track.name}, starts ${formatTime(clip.startTime)}, ${clip.duration.toFixed(3)} s`;
 }
 

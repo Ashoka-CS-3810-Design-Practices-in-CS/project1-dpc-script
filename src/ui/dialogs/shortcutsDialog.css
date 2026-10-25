@@ -1,0 +1,49 @@
+/* Keyboard shortcuts dialog. Shared colours come from styles.css. */
+.shortcuts-dialog {
+  min-width: 560px;
+  max-width: 760px;
+}
+
+.shortcuts-dialog h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.shortcuts-dialog h3 {
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shortcuts-dialog p {
+  margin: 0 0 14px;
+}
+
+.shortcuts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 28px;
+  margin-bottom: 16px;
+}
+
+.shortcuts-grid dl {
+  margin: 0 0 12px;
+}
+
+.shortcut-row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 3px 0;
+}
+
+.shortcut-row dt {
+  flex: none;
+  min-width: 120px;
+}
+
+.shortcut-row dd {
+  margin: 0;
+}

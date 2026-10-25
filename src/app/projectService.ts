@@ -9,7 +9,7 @@ import { parseProject, toJson, type ProjectJson } from '@/model/serializer';
 import { createSourceRegistry } from '@/model/sourceRegistry';
 import type { Project, SourceId } from '@/model/types';
 
-export interface ProjectDeps {
+interface ProjectDeps {
   store: ProjectStore;
   storage: StorageAdapter;
   edit: EditService;
@@ -213,7 +213,7 @@ export function createProjectService(deps: ProjectDeps): ProjectService {
     },
 
     reset() {
-      for (const track of [...store.get().tracks]) edit.deleteTrack(track.id);
+      edit.deleteAllTracks();
     },
 
     onError(listener) {

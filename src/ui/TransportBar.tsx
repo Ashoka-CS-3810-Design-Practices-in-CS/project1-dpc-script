@@ -2,6 +2,8 @@ import { useEffect, useState, type JSX } from 'react';
 import { PX_PER_SECOND_MAX, PX_PER_SECOND_MIN } from '@/model/constants';
 import { formatTime } from '@/ui/format';
 import { notify } from '@/ui/feedback';
+import { Kbd } from '@/ui/shortcutList';
+import { ThemeToggle } from '@/ui/ThemeToggle';
 import { useServices, useTransportState, useView, useViewStore } from '@/ui/servicesContext';
 
 // The zoom slider runs 0..1 and is logarithmic, so each step zooms by the same factor.
@@ -9,11 +11,11 @@ const ZOOM_RANGE = Math.log(PX_PER_SECOND_MAX / PX_PER_SECOND_MIN);
 const sliderToZoom = (v: number) => PX_PER_SECOND_MIN * Math.exp(v * ZOOM_RANGE);
 const zoomToSlider = (px: number) => Math.log(px / PX_PER_SECOND_MIN) / ZOOM_RANGE;
 
-/** Play/Pause, Stop, the clock, zoom and the snap switch. */
+/** Play/Pause, Stop, the clock and zoom. */
 export function TransportBar(): JSX.Element {
   const { transport } = useServices();
   const view = useViewStore();
-  const { pxPerSecond, snapEnabled } = useView();
+  const { pxPerSecond } = useView();
   const state = useTransportState();
   const [clock, setClock] = useState(() => formatTime(transport.position()));
 
@@ -47,11 +49,24 @@ export function TransportBar(): JSX.Element {
 
   return (
     <div className="bar transport-bar" role="toolbar" aria-label="Transport">
-      <button type="button" className="primary" aria-label={playLabel} onClick={onPlayClick}>
-        {playLabel}
+      <button
+        type="button"
+        className="primary"
+        aria-label={playLabel}
+        aria-keyshortcuts="Space"
+        title={`${playLabel} (Space)`}
+        onClick={onPlayClick}
+      >
+        {playLabel} <Kbd keys="Space" />
       </button>
-      <button type="button" aria-label="Stop" onClick={() => transport.stop()}>
-        Stop
+      <button
+        type="button"
+        aria-label="Stop"
+        aria-keyshortcuts="Home"
+        title="Stop and go back to the start (Home)"
+        onClick={() => transport.stop()}
+      >
+        Stop <Kbd keys="Home" />
       </button>
       <output className="clock" aria-live="off" aria-label="Playhead time">
         {clock}
@@ -60,6 +75,7 @@ export function TransportBar(): JSX.Element {
       <label className="zoom">
         Zoom
         <input
+          title="Zoom (+ / −, or Ctrl + mouse wheel)"
           type="range"
           aria-label="Zoom"
           min={0}
@@ -69,13 +85,15 @@ export function TransportBar(): JSX.Element {
           onChange={(e) => view.set({ pxPerSecond: sliderToZoom(Number(e.target.value)) })}
         />
       </label>
+      <span className="bar-divider" aria-hidden="true" />
       <button
         type="button"
-        aria-pressed={snapEnabled}
-        onClick={() => view.set({ snapEnabled: !snapEnabled })}
+        title="Show every keyboard shortcut (?)"
+        onClick={() => view.set({ dialog: 'shortcuts' })}
       >
-        Snap
+        Shortcuts <Kbd keys="?" />
       </button>
+      <ThemeToggle />
     </div>
   );
 }

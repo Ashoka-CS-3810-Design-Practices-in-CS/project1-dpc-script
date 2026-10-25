@@ -1,10 +1,7 @@
 import { useEffect, useRef, type DragEvent, type JSX } from 'react';
-import { MSG } from '@/app/messages';
 import { EmptyProject } from '@/ui/EmptyProject';
-import { notify } from '@/ui/feedback';
-import { formatDuration } from '@/ui/format';
 import { useProject, useServices, useViewStore } from '@/ui/servicesContext';
-import { report } from '@/ui/shortcuts';
+import { report, reportImported } from '@/ui/shortcuts';
 import { TrackHeaders } from '@/ui/tracks/TrackHeaders';
 import { ClipButtons, RulerSlider } from './accessible';
 import { contentHeight, trackIndexAt } from './geometry';
@@ -22,6 +19,8 @@ import './timeline.css';
 
 /** Pixels per wheel "line" when the browser reports line deltas (Firefox mouse wheels). */
 const WHEEL_LINE_PX = 16;
+/** Zoom per wheel pixel: about 20 % per notch of a mouse wheel (100 px). */
+const WHEEL_ZOOM_PER_PX = 0.002;
 
 /** Canvas colours from the CSS variables (styles.css, timeline.css). */
 function readPalette(el: HTMLElement): Palette {
@@ -37,9 +36,8 @@ function readPalette(el: HTMLElement): Palette {
     selection: v('--selection'),
     invalid: v('--invalid'),
     rowSelected: v('--tl-row-selected'),
-    clipBg: v('--tl-clip-bg'),
-    clipHeader: v('--tl-clip-header'),
-    waveform: v('--tl-waveform'),
+    signal: v('--signal'),
+    tracks: Array.from({ length: 8 }, (_, i) => v(`--track-${i + 1}`)),
     fadeShade: v('--tl-fade-shade'),
   };
 }
@@ -156,12 +154,36 @@ export function Timeline(): JSX.Element {
     observer.observe(area);
     resize();
 
+    // The theme toggle changes data-theme on <html>: read the colours again and redraw.
+    const themeWatch = new MutationObserver(() => {
+      Object.assign(colors, readPalette(root));
+      redraws.requestAll();
+      requestOverlay();
+    });
+    themeWatch.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+
     const offStore = store.subscribe(requestOverlay);
     const offView = view.subscribe(requestOverlay);
     const offTransport = transport.subscribe(requestOverlay);
 
     // Shift + wheel, or a horizontal trackpad swipe, scrolls the timeline sideways.
     function onWheel(e: WheelEvent): void {
+      // Ctrl/⌘ + wheel (also a trackpad pinch) zooms around the pointer.
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const unit = e.deltaMode === WheelEvent.DOM_DELTA_LINE ? WHEEL_LINE_PX : 1;
+        const factor = Math.exp(-e.deltaY * unit * WHEEL_ZOOM_PER_PX);
+        const x = e.clientX - area!.getBoundingClientRect().left;
+        const before = view.get();
+        const under = before.scrollOffset + x / before.pxPerSecond; // the time at the pointer
+        view.set({ pxPerSecond: before.pxPerSecond * factor });
+        const { pxPerSecond } = view.get(); // clamped
+        view.set({ scrollOffset: under - x / pxPerSecond });
+        return;
+      }
       const horizontal = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
       if (!horizontal) return;
       const unit = e.deltaMode === WheelEvent.DOM_DELTA_LINE ? WHEEL_LINE_PX : 1;
@@ -239,6 +261,7 @@ export function Timeline(): JSX.Element {
       disposed = true;
       resizeRef.current = null;
       observer.disconnect();
+      themeWatch.disconnect();
       redraws.dispose();
       offStore();
       offView();
@@ -272,8 +295,7 @@ export function Timeline(): JSX.Element {
     const trackId = index === null ? view.get().selectedTrackId : tracks[index].id;
     for (const file of files) {
       const r = await services.importer.importFile(file, trackId, services.transport.position());
-      report(r);
-      if (r.ok) notify.success(MSG.imported(r.value.fileName, formatDuration(r.value.duration)));
+      reportImported(r);
     }
   }
 

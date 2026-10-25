@@ -1,25 +1,18 @@
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
+import { useModalDialog } from '@/ui/useModalDialog';
 import { resolveConfirm, subscribeConfirm, type ConfirmRequest } from '@/ui/feedback';
 
 /** Shows whatever confirmDialog() is asking, one question at a time. */
 export function ConfirmDialog(): JSX.Element {
   const [request, setRequest] = useState<ConfirmRequest | null>(null);
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const dialogRef = useModalDialog(request !== null);
 
   useEffect(() => subscribeConfirm(setRequest), []);
-
-  // Open and close the native dialog to match the current request.
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (request && !dialog.open) dialog.showModal();
-    if (!request && dialog.open) dialog.close();
-  }, [request]);
 
   return (
     <dialog
       ref={dialogRef}
-      className="confirm-dialog"
+      className="modal confirm-dialog"
       aria-labelledby="confirm-title"
       aria-describedby="confirm-message"
       // Esc counts as Cancel. We close the dialog ourselves, once the answer is in.

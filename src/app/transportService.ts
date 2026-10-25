@@ -13,7 +13,7 @@ import { fail, ok, type Result } from '@/model/result';
 /** How often playback checks whether it has reached the end of the project. */
 const END_CHECK_MS = 50;
 
-export interface TransportDeps {
+interface TransportDeps {
   store: ProjectStore;
   engine: PlaybackEngine;
 }

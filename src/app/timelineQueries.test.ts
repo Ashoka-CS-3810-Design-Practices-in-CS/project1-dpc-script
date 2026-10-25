@@ -48,8 +48,8 @@ beforeEach(() => {
 describe('beginDrag (A4)', () => {
   it('8 px snaps, 9 px does not', () => {
     const drag = q.beginDrag(b2s, 0);
-    expect(drag.update(4.08, A, 100, true)).toMatchObject({ start: 4, snapLine: 4 });
-    expect(drag.update(4.09, A, 100, true)).toMatchObject({
+    expect(drag.update(4.08, A, 100)).toMatchObject({ start: 4, snapLine: 4 });
+    expect(drag.update(4.09, A, 100)).toMatchObject({
       start: 4.09,
       snapLine: null,
       valid: false,
@@ -81,7 +81,7 @@ describe('A3 Table 1: project size (16 tracks × 50 clips)', () => {
 
     // A drag over the full project: the clip fits a gap exactly and snaps into it.
     const last = q.visibleClips(ids[15], 198, 199)[0];
-    const preview = q.beginDrag(last.id, 0).update(101.02, ids[0], 100, true);
+    const preview = q.beginDrag(last.id, 0).update(101.02, ids[0], 100);
     expect(preview).toMatchObject({ start: 101, valid: true });
     expect(edit.moveClip(last.id, ids[0], preview.start).ok).toBe(true);
     expect(q.projectEnd()).toBe(199);

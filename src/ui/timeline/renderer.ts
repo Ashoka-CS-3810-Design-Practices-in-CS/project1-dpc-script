@@ -8,6 +8,7 @@ import {
 } from '@/model/constants';
 import type { AudioSource, Clip, Project, SourceId } from '@/model/types';
 import { formatTime } from '@/ui/format';
+import { trackColors } from '@/ui/trackColors';
 import type { ViewState, ViewStore } from '@/ui/viewStore';
 import { clipRect, rowTop, timeToX, xToTime, type Rect } from './geometry';
 
@@ -25,6 +26,7 @@ export type Ctx2D = Pick<
   | 'moveTo'
   | 'lineTo'
   | 'rect'
+  | 'roundRect'
   | 'clip'
   | 'fill'
   | 'stroke'
@@ -50,13 +52,14 @@ export interface Palette {
   selection: string;
   invalid: string;
   rowSelected: string;
-  clipBg: string;
-  clipHeader: string;
-  waveform: string;
+  /** The playhead. */
+  signal: string;
+  /** Clip colours per track, repeating. */
+  tracks: string[];
   fadeShade: string;
 }
 
-export interface RendererDeps {
+interface RendererDeps {
   queries: TimelineQueries;
   project: () => Project;
   view: () => ViewState;
@@ -74,11 +77,13 @@ const RULER_STEPS_S = [
   0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600,
 ] as const;
 const STRIPE_SPACING_PX = 12;
+/** Rounded clip corners. */
+const CLIP_RADIUS_PX = 6;
 const FONT = '12px system-ui, sans-serif';
 
 /** Seconds between ruler labels: the smallest step that keeps labels MIN_LABEL_SPACING_PX
  *  apart at this zoom. */
-export function rulerStep(pxPerSecond: number): number {
+function rulerStep(pxPerSecond: number): number {
   for (const step of RULER_STEPS_S) if (step * pxPerSecond >= MIN_LABEL_SPACING_PX) return step;
   return RULER_STEPS_S[RULER_STEPS_S.length - 1];
 }
@@ -204,17 +209,24 @@ export class TimelineRenderer {
     onClip?.(clip.id);
     ctx.save();
     ctx.beginPath();
-    ctx.rect(r.x, r.y, r.width, r.height);
+    ctx.roundRect(r.x, r.y, r.width, r.height, CLIP_RADIUS_PX);
     ctx.clip();
 
-    ctx.fillStyle = colors.clipBg;
+    const tc = trackColors(trackIndex, colors);
+    ctx.fillStyle = tc.clipBg;
     ctx.fillRect(r.x, r.y, r.width, r.height);
-    ctx.fillStyle = colors.clipHeader;
+    ctx.fillStyle = tc.clipHeader;
     ctx.fillRect(r.x, r.y, r.width, CLIP_HEADER_PX);
-    this.label(source?.fileName ?? '', r.x + FADE_HANDLE_PX + 4, r.y + CLIP_HEADER_PX / 2, r);
+    this.label(
+      source?.fileName ?? '',
+      r.x + FADE_HANDLE_PX + 4,
+      r.y + CLIP_HEADER_PX / 2,
+      r,
+      tc.headerText,
+    );
 
     if (!source || source.status === 'missing') this.drawMissing(body, source);
-    else this.drawWaveform(clip, r, body);
+    else this.drawWaveform(clip, r, body, tc.waveform);
     this.drawFades(clip, r, body);
 
     if (view.selection?.clipId === clip.id) {
@@ -234,11 +246,13 @@ export class TimelineRenderer {
     const selected = view.selectedClipId === clip.id;
     ctx.strokeStyle = selected ? colors.accent : colors.border;
     ctx.lineWidth = selected ? 2 : 1;
-    ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.width - 1, r.height - 1);
+    ctx.beginPath();
+    ctx.roundRect(r.x + 0.5, r.y + 0.5, r.width - 1, r.height - 1, CLIP_RADIUS_PX);
+    ctx.stroke();
     onClip?.(null);
   }
 
-  private drawWaveform(clip: Clip, r: Rect, body: Rect): void {
+  private drawWaveform(clip: Clip, r: Rect, body: Rect, color: string): void {
     const { ctx } = this;
     const view = this.deps.view();
     // Only the columns that are on screen; column 0 is the clip's first pixel.
@@ -253,7 +267,7 @@ export class TimelineRenderer {
     }
     const mid = body.y + body.height / 2;
     const half = body.height / 2 - 2;
-    ctx.strokeStyle = this.deps.colors.waveform;
+    ctx.strokeStyle = color;
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let j = 0; j < count; j++) {
@@ -314,13 +328,13 @@ export class TimelineRenderer {
   }
 
   /** One line of text, cut off at the edge of `within`. */
-  private label(text: string, x: number, y: number, within: Rect): void {
+  private label(text: string, x: number, y: number, within: Rect, color?: string): void {
     const { ctx } = this;
     ctx.save();
     ctx.beginPath();
     ctx.rect(within.x, within.y, within.width, within.height);
     ctx.clip();
-    ctx.fillStyle = this.deps.colors.fg;
+    ctx.fillStyle = color ?? this.deps.colors.fg;
     ctx.font = FONT;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
@@ -339,7 +353,7 @@ const DRAW_ALL_KINDS: ReadonlySet<Change['kind']> = new Set<Change['kind']>([
   'project',
 ]);
 
-export interface RedrawOptions {
+interface RedrawOptions {
   renderer: Pick<TimelineRenderer, 'drawAll' | 'drawClipsUsing'>;
   store: ProjectStore;
   view: ViewStore;
@@ -347,7 +361,7 @@ export interface RedrawOptions {
   requestFrame: (callback: () => void) => void;
 }
 
-export interface Redraws {
+interface Redraws {
   /** Schedule a full redraw on the next frame (e.g. after a resize). */
   requestAll(): void;
   dispose(): void;

@@ -30,6 +30,7 @@ const METHODS = [
   'moveTo',
   'lineTo',
   'rect',
+  'roundRect',
   'clip',
   'fill',
   'stroke',

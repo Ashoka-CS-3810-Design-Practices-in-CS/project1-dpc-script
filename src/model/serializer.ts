@@ -12,7 +12,7 @@ export interface ClipJson {
   fadeOut: number;
 }
 
-export interface TrackJson {
+interface TrackJson {
   id: string;
   name: string;
   volume: number;

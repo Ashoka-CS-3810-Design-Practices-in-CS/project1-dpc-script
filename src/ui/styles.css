@@ -1,18 +1,43 @@
-/* Colours and sizes both of us use. No dark mode. */
+/* Colours and sizes both of us use. The colours come from the logo: teal for action and
+   selection, signal orange for the playhead and mute, on cream (default) or ink. The
+   theme toggle in the project bar sets data-theme on <html>. */
 :root {
-  --bg: #ffffff;
-  --panel-bg: #f3f4f6;
-  --fg: #111827;
-  --muted-fg: #4b5563;
-  --border: #c4c9d0;
-  --accent: #1565c0;
-  --mute: #d32f2f; /* the M button, red */
-  --solo: #f9a825; /* the S button, yellow */
-  --selection: rgba(255, 152, 0, 0.35); /* highlighted region, orange */
-  --invalid: #d32f2f;
-  --focus: #1565c0;
+  color-scheme: light;
+  --bg: #f3eee6; /* cream: the page and the timeline rows */
+  --panel-bg: #fbf8f3;
+  --fg: #1b1f2b;
+  --muted-fg: #5e6272;
+  --border: #d9d0c2;
+  --btn: #efe8dc;
+  --btn-hover: #e5dccd;
+  --accent: #1f6f78; /* teal: primary buttons, selection, focus */
+  --accent-hover: #185a62;
+  --on-accent: #ffffff;
+  --signal: #e8572b; /* orange: the playhead */
+  --on-signal: #1b1f2b;
+  --mute: #e8572b; /* the M button */
+  --solo: #c9922e; /* the S button, gold */
+  --success: #2f8f5b;
+  --selection: rgba(232, 87, 43, 0.3); /* highlighted region */
+  --invalid: #c0392b;
+  --focus: #1f6f78;
+  --backdrop: rgba(27, 31, 43, 0.45);
+  --shadow: 0 6px 20px rgba(60, 40, 20, 0.2);
+  --tl-row-selected: #ece4d6;
+  --tl-fade-shade: rgba(27, 31, 43, 0.22);
+  /* One colour per track, repeating every 8. */
+  --track-1: #1f6f78;
+  --track-2: #e8572b;
+  --track-3: #c9922e;
+  --track-4: #7b4b94;
+  --track-5: #5f8f5a;
+  --track-6: #3f6fb5;
+  --track-7: #c4456e;
+  --track-8: #8a5a3c;
 
-  --bar-height: 44px;
+  --radius: 8px;
+  --radius-lg: 14px;
+  --bar-height: 48px;
   font-family:
     system-ui,
     -apple-system,
@@ -22,6 +47,40 @@
   font-size: 14px;
   color: var(--fg);
   background: var(--bg);
+}
+
+:root[data-theme='ink'] {
+  color-scheme: dark;
+  --bg: #11141e;
+  --panel-bg: #1a1f2e;
+  --fg: #f3eee6;
+  --muted-fg: #a9aebe;
+  --border: #2e3549;
+  --btn: #252c42;
+  --btn-hover: #2f3857;
+  --accent: #3bb0bc;
+  --accent-hover: #62c6d0;
+  --on-accent: #06181b;
+  --signal: #ff6f45;
+  --on-signal: #1b1f2b;
+  --mute: #ff6f45;
+  --solo: #e3ad45;
+  --success: #3ddc97;
+  --selection: rgba(255, 111, 69, 0.38);
+  --invalid: #ff6b6b;
+  --focus: #7dd3da;
+  --backdrop: rgba(0, 0, 0, 0.6);
+  --shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  --tl-row-selected: #1d2335;
+  --tl-fade-shade: rgba(5, 7, 14, 0.5);
+  --track-1: #3bb0bc;
+  --track-2: #ff6f45;
+  --track-3: #e3ad45;
+  --track-4: #b985d3;
+  --track-5: #86c27f;
+  --track-6: #6f9bea;
+  --track-7: #f07aa0;
+  --track-8: #d19a73;
 }
 
 *,
@@ -58,31 +117,69 @@ input[type='radio'] {
   min-height: 24px;
 }
 
-button {
-  padding: 4px 10px;
+input[type='range'] {
+  accent-color: var(--accent);
+}
+
+input[type='text'],
+select {
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: var(--bg);
+  padding: 3px 8px;
+}
+
+button {
+  padding: 4px 12px;
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--btn);
   cursor: pointer;
+  transition: background 0.12s;
 }
 
 button:hover:not(:disabled) {
-  background: var(--panel-bg);
+  background: var(--btn-hover);
 }
 
 button:disabled {
   color: var(--muted-fg);
+  opacity: 0.55;
   cursor: default;
 }
 
 button.primary {
   border-color: var(--accent);
   background: var(--accent);
-  color: #ffffff;
+  color: var(--on-accent);
+  font-weight: 600;
 }
 
 button.primary:hover:not(:disabled) {
-  background: #0d47a1;
+  background: var(--accent-hover);
+}
+
+/* The key hint inside a button or in the shortcuts list. */
+.kbd {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  font:
+    11px/16px ui-monospace,
+    'Cascadia Mono',
+    Consolas,
+    monospace;
+  opacity: 0.75;
+}
+
+.bar-divider {
+  align-self: stretch;
+  width: 1px;
+  margin: 10px 2px;
+  background: var(--border);
 }
 
 .visually-hidden {
@@ -99,28 +196,36 @@ button.primary:hover:not(:disabled) {
 .app {
   display: grid;
   grid-template-rows: auto auto 1fr auto auto;
+  gap: 8px;
   height: 100%;
+  padding: 8px;
 }
 
+/* The window is a stack of rounded cards. */
 .bar {
   display: flex;
+  flex-wrap: wrap; /* the project bar takes a second row on a narrow window */
   align-items: center;
-  gap: 8px;
+  gap: 6px 8px;
   min-height: var(--bar-height);
-  padding: 0 12px;
-  border-bottom: 1px solid var(--border);
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   background: var(--panel-bg);
 }
 
 .timeline-area {
   min-height: 0; /* lets the timeline shrink instead of pushing the page taller */
   overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
 }
 
 .status-line {
-  min-height: 24px;
-  padding: 4px 12px;
-  border-top: 1px solid var(--border);
+  min-height: 28px;
+  padding: 4px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   background: var(--panel-bg);
   color: var(--muted-fg);
 }
@@ -145,13 +250,13 @@ button.primary:hover:not(:disabled) {
   padding: 8px 8px 8px 12px;
   border: 1px solid var(--border);
   border-left-width: 6px;
-  border-radius: 4px;
-  background: var(--bg);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
+  box-shadow: var(--shadow);
 }
 
 .toast-success {
-  border-left-color: #2e7d32;
+  border-left-color: var(--success);
 }
 
 .toast-warning {
@@ -177,16 +282,21 @@ button.primary:hover:not(:disabled) {
 
 /* ---- confirmation dialog ---- */
 
-.confirm-dialog {
-  max-width: 420px;
-  padding: 16px 20px;
+/* Every dialog: confirm, export, open project, shortcuts. */
+.modal {
+  padding: 18px 22px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
   color: var(--fg);
 }
 
-.confirm-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.4);
+.modal::backdrop {
+  background: var(--backdrop);
+}
+
+.confirm-dialog {
+  max-width: 420px;
 }
 
 .confirm-dialog h2 {
@@ -225,17 +335,21 @@ button.primary:hover:not(:disabled) {
 button[aria-pressed='true'] {
   border-color: var(--accent);
   background: var(--accent);
-  color: #ffffff;
+  color: var(--on-accent);
+  font-weight: 600;
   /* Not colour alone: pressed toggles are also underlined and double-framed. */
   text-decoration: underline;
-  box-shadow: inset 0 0 0 2px #ffffff;
+  box-shadow: inset 0 0 0 2px var(--on-accent);
 }
 
 .project-name {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   border-color: transparent;
   background: transparent;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 700;
 }
 
 .project-name-input {
@@ -248,14 +362,6 @@ button[aria-pressed='true'] {
 
 .export-dialog {
   min-width: 360px;
-  padding: 16px 20px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--fg);
-}
-
-.export-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.4);
 }
 
 .export-dialog h2 {
@@ -289,4 +395,80 @@ button[aria-pressed='true'] {
 .dialog-error {
   margin: 0 0 12px;
   color: var(--invalid);
+}
+
+/* ---- brand and theme toggle ---- */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 10px;
+}
+
+.brand svg {
+  width: 30px;
+  height: 30px;
+  flex: none;
+}
+
+.brand-word {
+  font-family: ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, monospace;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.brand-word i {
+  color: var(--signal);
+  font-style: normal;
+}
+
+/* The theme switch: a pill with a sun and a moon, and a knob over the one in use. */
+.theme-switch {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  justify-items: center;
+  width: 56px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fg);
+}
+
+.theme-switch:hover:not(:disabled) {
+  background: var(--fg);
+  filter: brightness(1.15);
+}
+
+.theme-icon {
+  width: 15px;
+  height: 15px;
+  fill: var(--bg);
+  stroke: var(--bg);
+  stroke-width: 0;
+}
+
+.theme-knob {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg);
+  transition: transform 0.18s ease;
+}
+
+.theme-switch[aria-checked='true'] .theme-knob {
+  transform: translateX(26px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-knob {
+    transition: none;
+  }
 }

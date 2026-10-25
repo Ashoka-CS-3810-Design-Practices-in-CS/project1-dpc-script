@@ -3,7 +3,7 @@ import type { AudioContextLike, NodeLike } from '@/engine/audioTypes';
 import type { Clip } from '@/model/types';
 
 /** One step in a clip's signal chain (A3 Q6). Takes the node before it, returns its own. */
-export interface ClipEffect {
+interface ClipEffect {
   id: string;
   /** `t0`: seconds into the clip where playback starts. `w`: context time the clip starts sounding. */
   apply(ctx: AudioContextLike, input: NodeLike, clip: Clip, t0: number, w: number): NodeLike;
@@ -23,7 +23,7 @@ export class EffectRegistry {
 }
 
 /** Fade in and out: a gain node whose automation follows fadeSchedule. */
-export const fadeEffect: ClipEffect = {
+const fadeEffect: ClipEffect = {
   id: 'fade',
   apply(ctx, input, clip, t0, w) {
     const gain = ctx.createGain();

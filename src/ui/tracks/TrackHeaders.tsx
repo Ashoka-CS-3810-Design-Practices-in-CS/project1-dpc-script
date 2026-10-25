@@ -2,6 +2,7 @@ import { useState, type JSX } from 'react';
 import { RULER_HEIGHT_PX, TRACK_HEADER_WIDTH_PX } from '@/model/constants';
 import type { TrackId } from '@/model/types';
 import { useProject, useServices, useView, useViewStore } from '@/ui/servicesContext';
+import { Kbd } from '@/ui/shortcutList';
 import { TrackHeader } from './TrackHeader';
 import './tracks.css';
 
@@ -26,18 +27,19 @@ export function TrackHeaders(): JSX.Element {
   return (
     <div className="track-headers" style={{ width: TRACK_HEADER_WIDTH_PX }}>
       <div className="track-headers-ruler" style={{ height: RULER_HEIGHT_PX }} aria-hidden="true" />
-      {project.tracks.map((track) => (
+      {project.tracks.map((track, index) => (
         <TrackHeader
           key={track.id}
           track={track}
+          color={`var(--track-${(index % 8) + 1})`}
           selected={track.id === selectedTrackId}
           silencedBySolo={anySoloed && audible.get(track.id) === false}
           editing={track.id === editingId}
           onEditingChange={(editing) => setEditingId(editing ? track.id : null)}
         />
       ))}
-      <button type="button" className="add-track" onClick={addTrack}>
-        + Add track
+      <button type="button" className="add-track" title="Add a track (N)" onClick={addTrack}>
+        + Add track <Kbd keys="N" />
       </button>
     </div>
   );

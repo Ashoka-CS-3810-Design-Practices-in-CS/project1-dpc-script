@@ -3,6 +3,7 @@ import { MSG } from '@/app/messages';
 import type { Result } from '@/model/result';
 import type { Seconds } from '@/model/types';
 import { notify } from '@/ui/feedback';
+import { Kbd } from '@/ui/shortcutList';
 import { useProject, useServices, useView, useViewStore } from '@/ui/servicesContext';
 import { report, splitAtPlayhead } from '@/ui/shortcuts';
 import './clipPanel.css';
@@ -97,29 +98,36 @@ export function ClipPanel(): JSX.Element | null {
       <div className="clip-panel-buttons">
         <button
           type="button"
+          title="Keep only the selected region (T)"
           disabled={!region}
           onClick={() => region && report(edit.trimToSelection(clip.id, region.start, region.end))}
         >
-          Trim
-        </button>
-        <button type="button" onClick={() => splitAtPlayhead(services, viewStore)}>
-          Split
+          Trim <Kbd keys="T" />
         </button>
         <button
           type="button"
+          title="Split the clip at the playhead (S)"
+          onClick={() => splitAtPlayhead(services, viewStore)}
+        >
+          Split <Kbd keys="S" />
+        </button>
+        <button
+          type="button"
+          title="Cut out the selected region (Delete)"
           disabled={!region}
           onClick={() => region && report(edit.deleteRegion(clip.id, region.start, region.end))}
         >
-          Delete selection
+          Delete selection <Kbd keys="Del" />
         </button>
         <button
           type="button"
+          title="Remove the whole clip (Backspace)"
           onClick={() => {
             edit.removeClip(clip.id);
             viewStore.set({ selectedClipId: null, selection: null });
           }}
         >
-          Remove clip
+          Remove clip <Kbd keys="⌫" />
         </button>
       </div>
     </section>

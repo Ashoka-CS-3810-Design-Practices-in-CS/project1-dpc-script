@@ -29,6 +29,7 @@ export interface EditService {
   addTrack(): TrackId; // name "Track N", volume NEW_TRACK_VOLUME
   renameTrack(id: TrackId, name: string): Result;
   deleteTrack(id: TrackId): void; // removes its clips and releases their sources
+  deleteAllTracks(): void; // Reset: one edit, so one undo step
   setVolume(id: TrackId, volume: number): void; // clamps to 0..1; commit 'mix'
   toggleMute(id: TrackId): void; // commit 'mix'
   toggleSolo(id: TrackId): void; // commit 'mix'
@@ -43,6 +44,12 @@ export interface EditService {
   deleteRegion(clipId: ClipId, start: Seconds, end: Seconds): Result;
   removeClip(clipId: ClipId): void; // releases the source
   setFades(clipId: ClipId, fadeIn: Seconds, fadeOut: Seconds): Result;
+  /** Reverts the last edit above (each one is a single step; volume drags on one track count
+   *  as one). Fails with MSG.nothingToUndo. The history is cleared when a project is opened. */
+  undo(): Result;
+  redo(): Result; // fails with MSG.nothingToRedo
+  canUndo(): boolean;
+  canRedo(): boolean;
 }
 
 // ---------- Read-only timeline queries for the UI ----------
@@ -60,12 +67,7 @@ export interface DropPreview {
 }
 export interface DragSession {
   /** A4, per pointer move. candidateStart = pointer time − grab offset. */
-  update(
-    candidateStart: Seconds,
-    trackId: TrackId | null,
-    pxPerSecond: number,
-    snapEnabled: boolean,
-  ): DropPreview;
+  update(candidateStart: Seconds, trackId: TrackId | null, pxPerSecond: number): DropPreview;
 }
 export interface EdgeLimits {
   minStart: Seconds; // furthest the start edge may move left

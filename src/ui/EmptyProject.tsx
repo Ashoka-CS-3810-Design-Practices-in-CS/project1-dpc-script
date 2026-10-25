@@ -1,28 +1,15 @@
 import type { JSX } from 'react';
-import { MSG } from '@/app/messages';
-import { notify } from '@/ui/feedback';
-import { formatDuration } from '@/ui/format';
 import { useServices, useViewStore } from '@/ui/servicesContext';
+import { pickAndImportAudio } from '@/ui/shortcuts';
 
 /** Shown instead of the timeline when the project has no tracks. */
 export function EmptyProject(): JSX.Element {
-  const { edit, importer } = useServices();
+  const services = useServices();
+  const { edit } = services;
   const view = useViewStore();
 
   function addTrack(): void {
     view.set({ selectedTrackId: edit.addTrack() });
-  }
-
-  // With no track this yields MSG.importNoTrack (README §9.5 R9).
-  async function importAudio(): Promise<void> {
-    const r = await importer.pickAndImport(view.get().selectedTrackId, 0);
-    if (r === null) return; // the picker was cancelled
-    if (!r.ok) {
-      notify.error(r.error);
-      return;
-    }
-    notify.success(MSG.imported(r.value.fileName, formatDuration(r.value.duration)));
-    r.warnings?.forEach(notify.warning);
   }
 
   return (
@@ -32,7 +19,7 @@ export function EmptyProject(): JSX.Element {
         <button type="button" className="primary" onClick={addTrack}>
           Add a track
         </button>
-        <button type="button" onClick={() => void importAudio()}>
+        <button type="button" onClick={() => void pickAndImportAudio(services, view)}>
           Import audio
         </button>
       </div>

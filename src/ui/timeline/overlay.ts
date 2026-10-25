@@ -4,7 +4,7 @@ import { clipRect, timeToX, type Viewport } from './geometry';
 import type { Ctx2D, Palette } from './renderer';
 
 /** What a clip drag looks like right now (filled in by the interactions, VR-08). */
-export interface DragPreview {
+interface DragPreview {
   trackIndex: number | null; // null = pointer is not over a track row
   start: Seconds;
   duration: Seconds;
@@ -13,7 +13,7 @@ export interface DragPreview {
 }
 
 /** The fade lengths a fade-handle drag would set (VR-08). */
-export interface FadePreview {
+interface FadePreview {
   trackIndex: number;
   start: Seconds;
   duration: Seconds;
@@ -30,7 +30,7 @@ export interface Preview {
 
 export const NO_PREVIEW: Preview = { drag: null, fades: null };
 
-export interface OverlayState extends Preview {
+interface OverlayState extends Preview {
   playhead: Seconds;
 }
 
@@ -42,7 +42,7 @@ export function drawOverlay(
   size: { width: number; height: number },
   view: Viewport,
   state: OverlayState,
-  colors: Pick<Palette, 'accent' | 'invalid' | 'fg'>,
+  colors: Pick<Palette, 'accent' | 'invalid' | 'signal'>,
 ): void {
   ctx.clearRect(0, 0, size.width, size.height);
 
@@ -90,8 +90,8 @@ export function drawOverlay(
 
   const x = Math.round(timeToX(state.playhead, view)) + 0.5;
   if (x >= 0 && x <= size.width) {
-    ctx.strokeStyle = colors.fg;
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = colors.signal;
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, size.height);

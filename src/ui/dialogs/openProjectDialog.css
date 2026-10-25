@@ -2,14 +2,6 @@
 .open-dialog {
   min-width: 520px;
   max-width: 720px;
-  padding: 16px 20px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--fg);
-}
-
-.open-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.4);
 }
 
 .open-dialog h2 {

@@ -3,7 +3,7 @@ import type { Services, TransportState } from '@/app/contracts';
 import type { Project } from '@/model/types';
 import type { ViewState, ViewStore } from './viewStore';
 
-export interface AppContextValue {
+interface AppContextValue {
   services: Services;
   view: ViewStore;
 }

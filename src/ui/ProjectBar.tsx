@@ -2,19 +2,22 @@ import { useState, type JSX } from 'react';
 import { MSG } from '@/app/messages';
 import { ExportDialog } from '@/ui/dialogs/ExportDialog';
 import { OpenProjectDialog } from '@/ui/dialogs/OpenProjectDialog';
+import { Brand } from '@/ui/Brand';
+import { ShortcutsDialog } from '@/ui/dialogs/ShortcutsDialog';
 import { confirmDialog, notify } from '@/ui/feedback';
-import { formatDuration } from '@/ui/format';
-import { useProject, useServices, useViewStore } from '@/ui/servicesContext';
+import { useProject, useServices, useView, useViewStore } from '@/ui/servicesContext';
+import { Kbd, MOD } from '@/ui/shortcutList';
+import { pickAndImportAudio, report } from '@/ui/shortcuts';
 
 /** The project name (click to rename) and New / Open / Save / Import / Export / Reset. */
 export function ProjectBar(): JSX.Element {
-  const { projects, importer, transport, store } = useServices();
+  const services = useServices();
+  const { projects, edit, store } = services;
   const view = useViewStore();
+  const { dialog } = useView();
   const project = useProject();
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState('');
-  const [openDialog, setOpenDialog] = useState(false);
-  const [exportDialog, setExportDialog] = useState(false);
 
   function startRename(): void {
     setDraft(project.name);
@@ -34,19 +37,7 @@ export function ProjectBar(): JSX.Element {
   }
 
   async function onSave(): Promise<void> {
-    const result = await projects.save();
-    if (!result.ok) notify.error(result.error);
-  }
-
-  async function onImport(): Promise<void> {
-    const result = await importer.pickAndImport(view.get().selectedTrackId, transport.position());
-    if (result === null) return; // the picker was cancelled
-    if (!result.ok) {
-      notify.error(result.error);
-      return;
-    }
-    notify.success(MSG.imported(result.value.fileName, formatDuration(result.value.duration)));
-    result.warnings?.forEach(notify.warning);
+    report(await projects.save());
   }
 
   async function onReset(): Promise<void> {
@@ -55,6 +46,7 @@ export function ProjectBar(): JSX.Element {
 
   return (
     <header className="bar project-bar" aria-label="Project">
+      <Brand />
       {renaming ? (
         <input
           className="project-name-input"
@@ -79,26 +71,58 @@ export function ProjectBar(): JSX.Element {
         </button>
       )}
       <span className="bar-spacer" />
+      <button
+        type="button"
+        title={`Undo (${MOD}+Z)`}
+        aria-keyshortcuts={`${MOD}+Z`}
+        disabled={!edit.canUndo()}
+        onClick={() => report(edit.undo())}
+      >
+        Undo <Kbd keys={`${MOD}+Z`} />
+      </button>
+      <button
+        type="button"
+        title={`Redo (${MOD}+Y or ${MOD}+Shift+Z)`}
+        aria-keyshortcuts={`${MOD}+Shift+Z`}
+        disabled={!edit.canRedo()}
+        onClick={() => report(edit.redo())}
+      >
+        Redo <Kbd keys={`${MOD}+Y`} />
+      </button>
+      <span className="bar-divider" aria-hidden="true" />
       <button type="button" onClick={onNew}>
         New
       </button>
-      <button type="button" onClick={() => setOpenDialog(true)}>
-        Open
+      <button
+        type="button"
+        title={`Open a saved project (${MOD}+O)`}
+        onClick={() => view.set({ dialog: 'open' })}
+      >
+        Open <Kbd keys={`${MOD}+O`} />
       </button>
-      <button type="button" onClick={onSave}>
-        Save
+      <button type="button" title={`Save (${MOD}+S)`} onClick={onSave}>
+        Save <Kbd keys={`${MOD}+S`} />
       </button>
-      <button type="button" onClick={onImport}>
-        Import
+      <button
+        type="button"
+        title="Import an audio file (I)"
+        onClick={() => void pickAndImportAudio(services, view)}
+      >
+        Import <Kbd keys="I" />
       </button>
-      <button type="button" onClick={() => setExportDialog(true)}>
-        Export
+      <button
+        type="button"
+        title="Export a WAV file (E)"
+        onClick={() => view.set({ dialog: 'export' })}
+      >
+        Export <Kbd keys="E" />
       </button>
       <button type="button" onClick={onReset}>
         Reset
       </button>
-      <OpenProjectDialog open={openDialog} onClose={() => setOpenDialog(false)} />
-      <ExportDialog open={exportDialog} onClose={() => setExportDialog(false)} />
+      <OpenProjectDialog open={dialog === 'open'} onClose={() => view.set({ dialog: null })} />
+      <ExportDialog open={dialog === 'export'} onClose={() => view.set({ dialog: null })} />
+      <ShortcutsDialog />
     </header>
   );
 }

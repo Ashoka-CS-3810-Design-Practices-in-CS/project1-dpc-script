@@ -20,7 +20,7 @@ current Chromium, Firefox or Safari window at least 1280 px wide.
 3. Select the second track and import `music-stereo.wav`. Or drag the file straight onto the
    track.
 4. Press **Space** to play and **Space** again to pause. **Home** stops and returns to 0.
-5. Drag the music clip sideways. With **Snap** on, it clicks to clip edges and the playhead; a
+5. Drag the music clip sideways. It clicks to clip edges and the playhead; a
    clip can never overlap its neighbour.
 
 ## 2. Remove a mistake (UC2)

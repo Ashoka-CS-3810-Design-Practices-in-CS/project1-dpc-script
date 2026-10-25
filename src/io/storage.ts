@@ -1,7 +1,7 @@
 import { openDB, type DBSchema } from 'idb';
 import { DB_NAME } from '@/model/constants';
 
-export interface ProjectRecord {
+interface ProjectRecord {
   id: string;
   name: string;
   updatedAt: number;
@@ -9,7 +9,7 @@ export interface ProjectRecord {
   json: string;
 }
 
-export interface SourceRecord {
+interface SourceRecord {
   id: string;
   projectId: string;
   fileName: string;

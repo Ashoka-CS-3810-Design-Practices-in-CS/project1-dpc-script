@@ -23,7 +23,7 @@ import {
   removeTrack,
   replaceClipAt,
 } from '@/model/trackOps';
-import type { Clip, ClipId, Project } from '@/model/types';
+import type { AudioSource, Clip, ClipId, Project, Track } from '@/model/types';
 
 const EDIT_MESSAGES: Record<EditErrorCode, string> = {
   'too-short': MSG.editTooShort,
@@ -34,7 +34,7 @@ const EDIT_MESSAGES: Record<EditErrorCode, string> = {
 };
 
 /** The user-facing message for an A5 edit error code. */
-export function editErrorMessage(code: EditErrorCode): string {
+function editErrorMessage(code: EditErrorCode): string {
   return EDIT_MESSAGES[code];
 }
 
@@ -76,10 +76,84 @@ function toClip(base: Clip, piece: ClipLike, id: ClipId): Clip {
   };
 }
 
+/** Undo steps kept; the oldest is dropped past this. */
+const HISTORY_LIMIT = 100;
+
+/** The project as it was before an edit. Clips are plain numbers, so copying them is cheap; the
+ *  decoded audio is only referenced, never copied (README §2.2: edits never touch it). */
+interface Snapshot {
+  tracks: Track[];
+  sources: AudioSource[]; // so undoing a clip removal can bring its audio back
+  key?: string; // edits with the same key in a row (a volume drag) share one step
+}
+
+const copyTracks = (tracks: Track[]): Track[] =>
+  tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c })) }));
+
+/** Puts a snapshot's tracks back and makes every source's reference count match them. */
+function restore(p: Project, snap: Snapshot): void {
+  p.tracks = copyTracks(snap.tracks);
+  const want = new Map<string, number>();
+  for (const track of p.tracks) {
+    for (const clip of track.clips) want.set(clip.sourceId, (want.get(clip.sourceId) ?? 0) + 1);
+  }
+  for (const source of p.sources.all()) {
+    const target = want.get(source.id) ?? 0;
+    while (p.sources.get(source.id) && p.sources.get(source.id)!.refCount > target) {
+      p.sources.release(source.id); // at 0 the entry is removed
+    }
+    while (target > 0 && p.sources.get(source.id)!.refCount < target) p.sources.retain(source.id);
+  }
+  for (const source of snap.sources) {
+    const target = want.get(source.id) ?? 0;
+    if (target > 0 && !p.sources.get(source.id)) p.sources.add({ ...source, refCount: target });
+  }
+}
+
 /** The only code that changes tracks and clips. Every method validates first, changes the
- *  project only on success, then commits exactly once. */
+ *  project only on success, then commits exactly once. Each successful one is also an undo
+ *  step. */
 export function createEditService(store: ProjectStore): EditService {
-  return {
+  let undoStack: Snapshot[] = [];
+  let redoStack: Snapshot[] = [];
+
+  // A New/Open/Reset-all replaces the project, so the old history means nothing.
+  store.subscribe((c) => {
+    if (c.kind === 'project') {
+      undoStack = [];
+      redoStack = [];
+    }
+  });
+
+  const snapshot = (key?: string): Snapshot => ({
+    tracks: copyTracks(store.get().tracks),
+    sources: store.get().sources.all(),
+    key,
+  });
+
+  /** Runs one edit; if it committed, the state from before it becomes an undo step. */
+  function record<T>(edit: () => T, key?: string): T {
+    const before = snapshot(key);
+    const version = store.version();
+    const result = edit();
+    if (store.version() !== version) {
+      const last = undoStack.at(-1);
+      if (!(key !== undefined && last?.key === key)) undoStack.push(before);
+      if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+      redoStack = [];
+    }
+    return result;
+  }
+
+  /** Moves one step between the stacks. */
+  function step(from: Snapshot[], to: Snapshot[]): void {
+    const target = from.pop()!;
+    to.push(snapshot());
+    restore(store.get(), target);
+    store.commit({ kind: 'structure' });
+  }
+
+  const base: Omit<EditService, 'undo' | 'redo' | 'canUndo' | 'canRedo'> = {
     addTrack() {
       const p = store.get();
       const id = newId();
@@ -111,6 +185,16 @@ export function createEditService(store: ProjectStore): EditService {
       if (!found) return;
       for (const clip of found.track.clips) p.sources.release(clip.sourceId);
       removeTrack(p, id);
+      store.commit({ kind: 'structure' });
+    },
+
+    deleteAllTracks() {
+      const p = store.get();
+      if (p.tracks.length === 0) return;
+      for (const track of p.tracks) {
+        for (const clip of track.clips) p.sources.release(clip.sourceId);
+      }
+      p.tracks = [];
       store.commit({ kind: 'structure' });
     },
 
@@ -237,5 +321,45 @@ export function createEditService(store: ProjectStore): EditService {
       store.commit({ kind: 'structure' });
       return done();
     },
+  };
+
+  /** An edit that is also an undo step. */
+  const recorded =
+    <A extends unknown[], R>(fn: (...args: A) => R) =>
+    (...args: A): R =>
+      record(() => fn(...args));
+
+  return {
+    addTrack: recorded(base.addTrack),
+    renameTrack: recorded(base.renameTrack),
+    deleteTrack: recorded(base.deleteTrack),
+    deleteAllTracks: recorded(base.deleteAllTracks),
+    toggleMute: recorded(base.toggleMute),
+    toggleSolo: recorded(base.toggleSolo),
+    addClip: recorded(base.addClip),
+    moveClip: recorded(base.moveClip),
+    removeClip: recorded(base.removeClip),
+    trimToSelection: recorded(base.trimToSelection),
+    trimEdge: recorded(base.trimEdge),
+    split: recorded(base.split),
+    deleteRegion: recorded(base.deleteRegion),
+    setFades: recorded(base.setFades),
+    // A volume drag on one track is one step.
+    setVolume: (id, volume) => record(() => base.setVolume(id, volume), `volume:${id}`),
+
+    undo() {
+      if (undoStack.length === 0) return fail(MSG.nothingToUndo);
+      step(undoStack, redoStack);
+      return done();
+    },
+
+    redo() {
+      if (redoStack.length === 0) return fail(MSG.nothingToRedo);
+      step(redoStack, undoStack);
+      return done();
+    },
+
+    canUndo: () => undoStack.length > 0,
+    canRedo: () => redoStack.length > 0,
   };
 }

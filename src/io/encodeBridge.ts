@@ -1,6 +1,6 @@
 import type { EncodeMessage, EncodeRequest } from '@/io/workers/encode.worker';
 
-export interface EncodeResult {
+interface EncodeResult {
   bytes: ArrayBuffer;
   clippedSamples: number;
 }

@@ -33,20 +33,11 @@ export function createTimelineQueries(store: ProjectStore): TimelineQueries {
     const points = collectSnapPoints(times);
 
     return {
-      update(candidateStart, trackId, pxPerSecond, snapEnabled) {
+      update(candidateStart, trackId, pxPerSecond) {
         let start = Math.max(0, candidateStart);
-        let snapLine: Seconds | null = null;
-        if (snapEnabled) {
-          const snapped = snapStart(
-            points,
-            start,
-            duration,
-            SNAP_DISTANCE_PX / pxPerSecond,
-            EPSILON,
-          );
-          start = Math.max(0, snapped.start);
-          snapLine = snapped.snappedTo;
-        }
+        const snapped = snapStart(points, start, duration, SNAP_DISTANCE_PX / pxPerSecond, EPSILON);
+        start = Math.max(0, snapped.start);
+        const snapLine: Seconds | null = snapped.snappedTo;
         const to = trackId === null ? null : findTrack(store.get(), trackId);
         const skip = to?.track === from.track ? from.clipIndex : -1;
         const valid = to !== null && placementValid(to.track.clips, start, duration, skip, EPSILON);

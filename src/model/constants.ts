@@ -62,7 +62,6 @@ export const FADE_HANDLE_PX = 10;
 /** Narrowest supported layout (A3 §4.6). */
 export const MIN_LAYOUT_WIDTH_PX = 1280;
 /** Smallest clickable target, 24 × 24 px (A3 §4.7). */
-export const MIN_TARGET_PX = 24;
 
 /** IndexedDB database name (A2 DS7). */
 export const DB_NAME = 'dpcs-editor';

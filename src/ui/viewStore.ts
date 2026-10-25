@@ -9,10 +9,10 @@ export interface Selection {
 export interface ViewState {
   pxPerSecond: number; // clamped to [PX_PER_SECOND_MIN, PX_PER_SECOND_MAX]
   scrollOffset: Seconds; // clamped ≥ 0
-  snapEnabled: boolean; // default true
   selectedTrackId: TrackId | null;
   selectedClipId: ClipId | null;
   selection: Selection | null; // highlighted region (orange)
+  dialog: 'open' | 'export' | 'shortcuts' | null; // which dialog is showing, if any
 }
 export interface ViewStore {
   get(): ViewState;
@@ -23,10 +23,10 @@ export interface ViewStore {
 const DEFAULTS: ViewState = {
   pxPerSecond: PX_PER_SECOND_DEFAULT,
   scrollOffset: 0,
-  snapEnabled: true,
   selectedTrackId: null,
   selectedClipId: null,
   selection: null,
+  dialog: null,
 };
 
 function clamped(state: ViewState): ViewState {

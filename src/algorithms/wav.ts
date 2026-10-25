@@ -11,7 +11,7 @@ export function wavByteLength(frames: number, channels: number): number {
   return HEADER_BYTES + BYTES_PER_SAMPLE * frames * channels;
 }
 
-export interface WavResult {
+interface WavResult {
   bytes: ArrayBuffer;
   clippedSamples: number;
 }

@@ -4,8 +4,9 @@
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 8px 16px;
-  padding: 8px 12px;
-  border-top: 1px solid var(--border);
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   background: var(--panel-bg);
 }
 

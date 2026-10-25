@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { useRef, useState, type JSX } from 'react';
 import type { ExportProgress, ExportSettings } from '@/app/contracts';
 import { MSG } from '@/app/messages';
 import { EXPORT_SAMPLE_RATES } from '@/model/constants';
 import { notify } from '@/ui/feedback';
 import { formatDuration, formatMB } from '@/ui/format';
 import { useProject, useServices } from '@/ui/servicesContext';
+import { useModalDialog } from '@/ui/useModalDialog';
 
-export interface ExportDialogProps {
+interface ExportDialogProps {
   open: boolean;
   onClose: () => void;
 }
@@ -20,7 +21,7 @@ export function ExportDialog({ open, onClose }: ExportDialogProps): JSX.Element 
 function ExportForm({ onClose }: { onClose: () => void }): JSX.Element {
   const { exporter } = useServices();
   const project = useProject();
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const dialogRef = useModalDialog();
   const abortRef = useRef<AbortController | null>(null);
 
   const [fileName, setFileName] = useState(project.name);
@@ -31,11 +32,6 @@ function ExportForm({ onClose }: { onClose: () => void }): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<ExportProgress | null>(null);
   const exporting = progress !== null;
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
-  }, []);
 
   const settings: ExportSettings = { fileName, sampleRate, channels };
 
@@ -75,7 +71,7 @@ function ExportForm({ onClose }: { onClose: () => void }): JSX.Element {
   return (
     <dialog
       ref={dialogRef}
-      className="export-dialog"
+      className="modal export-dialog"
       aria-labelledby="export-title"
       onCancel={(e) => {
         // Esc: stop the export if one is running, otherwise close.
