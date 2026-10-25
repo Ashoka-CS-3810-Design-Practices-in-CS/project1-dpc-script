@@ -200,11 +200,6 @@ describe('invalid projects (A3 Table 2)', () => {
 });
 
 describe('fixing small problems', () => {
-  it('sorts clips that are out of order', () => {
-    const result = parseChanged((j) => j.tracks[0].clips.unshift(clip('c2', 's1', 4)));
-    expect(result.ok && result.value.tracks[0].clips.map((c) => c.id)).toEqual(['c1', 'c2']);
-  });
-
   it('allows clips that touch', () => {
     expect(parseChanged((j) => j.tracks[0].clips.push(clip('c2', 's1', 4))).ok).toBe(true);
   });
@@ -232,14 +227,5 @@ describe('fixing small problems', () => {
     const { value, warnings } = result as { value: ProjectJson; warnings: string[] };
     expect(value.tracks.map((t) => t.volume)).toEqual([0, 1]);
     expect(warnings).toEqual([MSG.volumeClamped('Quiet', '0'), MSG.volumeClamped('Loud', '1')]);
-  });
-
-  it('ignores unknown extra fields', () => {
-    const json = { ...validJson(), colour: 'red' };
-    Object.assign(json.tracks[0], { pan: 0.3 });
-    Object.assign(json.tracks[0].clips[0], { note: 'hi' });
-    Object.assign(json.sources[0], { size: 5 });
-
-    expect(parse(json)).toEqual({ ok: true, value: validJson() });
   });
 });

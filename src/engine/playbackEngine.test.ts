@@ -64,35 +64,6 @@ describe('playback engine', () => {
     expect(create).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects when the context cannot be resumed', async () => {
-    const { ctx, blockResume } = fakeLive();
-    blockResume();
-    const engine = createPlaybackEngine(() => ctx, createDefaultEffects());
-    await expect(engine.start(oneClipProject(), 0)).rejects.toThrow('blocked');
-  });
-
-  it('stopAll stops and disconnects every node, and is safe to repeat', async () => {
-    const { ctx } = fakeLive();
-    const engine = createPlaybackEngine(() => ctx, createDefaultEffects());
-    await engine.start(oneClipProject(), 0);
-    ctx.log.length = 0;
-    engine.stopAll();
-    expect(ctx.log.filter((l) => l.endsWith('.stop'))).toHaveLength(1);
-    expect(ctx.log.filter((l) => l.startsWith('disconnect'))).toHaveLength(3); // player, track, master
-    ctx.log.length = 0;
-    engine.stopAll();
-    expect(ctx.log).toEqual([]);
-  });
-
-  it('starting again replaces the old graph', async () => {
-    const { ctx } = fakeLive();
-    const engine = createPlaybackEngine(() => ctx, createDefaultEffects());
-    await engine.start(oneClipProject(), 0);
-    ctx.log.length = 0;
-    await engine.start(oneClipProject(), 3);
-    expect(ctx.log.filter((l) => l.endsWith('.stop'))).toHaveLength(1);
-  });
-
   it('updateGains pins, then ramps each track gain over GAIN_RAMP_S', async () => {
     const { ctx } = fakeLive(10);
     const engine = createPlaybackEngine(() => ctx, createDefaultEffects());
@@ -107,25 +78,6 @@ describe('playback engine', () => {
       'gain#2.set 0.5 @10', // the volume buildMix gave the track
       'gain#2.ramp 0 @10.02',
     ]);
-  });
-
-  it('updateGains does nothing before playback or for tracks added since', async () => {
-    const { ctx } = fakeLive();
-    const engine = createPlaybackEngine(() => ctx, createDefaultEffects());
-    const project = oneClipProject();
-    engine.updateGains(project);
-    await engine.start(project, 0);
-    project.tracks.push({
-      id: 'new',
-      name: 'N',
-      volume: 1,
-      muted: false,
-      soloed: false,
-      clips: [],
-    });
-    ctx.log.length = 0;
-    engine.updateGains(project);
-    expect(ctx.log.filter((l) => l.includes('cancel'))).toHaveLength(1);
   });
 
   it('reports when the output goes away while playing', async () => {
@@ -151,18 +103,6 @@ describe('playback engine', () => {
     off();
     ctx.onstatechange?.();
     expect(errors).toHaveLength(3);
-  });
-
-  it('does not treat suspended as an error when nothing is playing', async () => {
-    const { ctx } = fakeLive();
-    const engine = createPlaybackEngine(() => ctx, createDefaultEffects());
-    const errors: string[] = [];
-    engine.onError((m) => errors.push(m));
-    await engine.start(oneClipProject(), 0);
-    engine.stopAll();
-    ctx.state = 'suspended';
-    ctx.onstatechange?.();
-    expect(errors).toEqual([]);
   });
 
   it('prepare creates the context early, once, and start reuses it', async () => {

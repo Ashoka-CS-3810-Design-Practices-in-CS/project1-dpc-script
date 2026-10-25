@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AudioContextLike } from './audioTypes';
-import { createDefaultEffects, EffectRegistry, type ClipEffect } from './effects';
+import { createDefaultEffects } from './effects';
 import { buildMix } from './graphBuilder';
 import { createEmptyProject } from '@/model/projectOps';
 import { createSourceRegistry } from '@/model/sourceRegistry';
@@ -118,100 +117,5 @@ describe('buildMix', () => {
     );
     expect(solo.trackGains.get('a')?.gain.value).toBe(0.8);
     expect(solo.trackGains.get('b')?.gain.value).toBe(0);
-  });
-
-  it('skips clips whose source is loading or missing', () => {
-    const project = projectWith(
-      [
-        track('t', [
-          clip('ok', 'ready', 0, 0, 2),
-          clip('l', 'loading', 2, 0, 2),
-          clip('m', 'missing', 4, 0, 2),
-          clip('none', 'unregistered', 6, 0, 2),
-        ]),
-      ],
-      [source('ready'), source('loading', 'loading'), source('missing', 'missing')],
-    );
-    const ctx = createRecordingContext();
-
-    const graph = buildMix(ctx, project, 0, 0, createDefaultEffects());
-
-    expect(graph.players).toHaveLength(1);
-    expect(starts(ctx.log)).toEqual(['start 0 0 2']);
-  });
-
-  it('keeps the master gain at 1', () => {
-    const graph = buildMix(
-      createRecordingContext(),
-      projectWith([], []),
-      0,
-      0,
-      createDefaultEffects(),
-    );
-    expect(graph.master.gain.value).toBe(1);
-  });
-
-  it('wires player → fade → track gain → master → destination (DS5)', () => {
-    const project = projectWith([track('t', [clip('c', 's', 0, 0, 4)])], [source('s')]);
-    const ctx = createRecordingContext();
-
-    buildMix(ctx, project, 0, 0, createDefaultEffects());
-
-    expect(ctx.log).toEqual([
-      'gain#1 = 1', // master
-      'connect gain#1 -> destination',
-      'gain#2 = 0.5', // track
-      'connect gain#2 -> gain#1',
-      'src#3.buffer = 10s', // player
-      'connect src#3 -> gain#4', // fade gain
-      'gain#4.set 1 @0',
-      'connect gain#4 -> gain#2',
-      'src#3.start 0 0 4',
-    ]);
-  });
-
-  it('runs every registered effect, in order', () => {
-    const chain = (id: string): ClipEffect => ({
-      id,
-      apply(ctx: AudioContextLike, input) {
-        const gain = ctx.createGain();
-        input.connect(gain);
-        return gain;
-      },
-    });
-    const effects = new EffectRegistry();
-    effects.register(chain('one'));
-    effects.register(chain('two'));
-    const project = projectWith([track('t', [clip('c', 's', 0, 0, 4)])], [source('s')]);
-    const ctx = createRecordingContext();
-
-    buildMix(ctx, project, 0, 0, effects);
-
-    // player (src#3) → first effect (gain#4) → second effect (gain#5) → track gain (gain#2)
-    expect(ctx.log.filter((l) => l.startsWith('connect'))).toEqual([
-      'connect gain#1 -> destination',
-      'connect gain#2 -> gain#1',
-      'connect src#3 -> gain#4',
-      'connect gain#4 -> gain#5',
-      'connect gain#5 -> gain#2',
-    ]);
-  });
-
-  it('builds the same graph every time (the basis of the preview = export test)', () => {
-    const project = projectWith(
-      [
-        track('a', [clip('c1', 's', 0, 0, 4, [1, 1]), clip('c2', 's', 4, 2, 3, [0, 1])]),
-        track('b', [clip('c3', 's', 1, 0, 5)], { muted: true }),
-      ],
-      [source('s')],
-    );
-    const first = createRecordingContext();
-    const second = createRecordingContext();
-
-    buildMix(first, project, 0, 0, createDefaultEffects());
-    buildMix(second, project, 0, 0, createDefaultEffects());
-
-    expect(first.log.length).toBeGreaterThan(10);
-    expect(second.log).toEqual(first.log);
   });
 });

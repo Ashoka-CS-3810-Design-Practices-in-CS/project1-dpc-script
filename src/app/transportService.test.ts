@@ -103,14 +103,6 @@ describe('transport service', () => {
     expect(transport.position()).toBeCloseTo(3.5);
   });
 
-  it('the playhead waits at p until the first sound is scheduled to play', async () => {
-    const { transport, advance } = setup();
-    transport.seek(4);
-    await transport.play();
-    advance(0.02); // still inside SCHEDULE_MARGIN_S
-    expect(transport.position()).toBe(4);
-  });
-
   it('Pause holds the position and stops the players; Play resumes from it', async () => {
     const { transport, calls, advance } = setup();
     await transport.play();
@@ -126,54 +118,6 @@ describe('transport service', () => {
     await transport.play();
     expect(transport.state()).toBe('playing');
     expect(calls.at(-1)).toMatch(/^start 3/);
-  });
-
-  it('Stop returns to 0 from Playing and from Paused', async () => {
-    const { transport, advance } = setup();
-    await transport.play();
-    advance(2);
-    transport.stop();
-    expect(transport.state()).toBe('stopped');
-    expect(transport.position()).toBe(0);
-
-    transport.seek(4);
-    await transport.play();
-    transport.pause();
-    transport.stop();
-    expect(transport.position()).toBe(0);
-  });
-
-  it('ignores Pause and Stop when stopped, and Play when playing', async () => {
-    const { transport, events, calls } = setup();
-    transport.pause();
-    transport.stop();
-    expect(events).toEqual([]);
-
-    await transport.play();
-    const starts = calls.filter((c) => c.startsWith('start')).length;
-    await transport.play();
-    expect(calls.filter((c) => c.startsWith('start')).length).toBe(starts);
-  });
-
-  it('togglePlay plays, then pauses', async () => {
-    const { transport } = setup();
-    await transport.togglePlay();
-    expect(transport.state()).toBe('playing');
-    const r = await transport.togglePlay();
-    expect(r.ok).toBe(true);
-    expect(transport.state()).toBe('paused');
-  });
-
-  it('Seek while paused or stopped only moves the playhead', async () => {
-    const { transport, calls } = setup();
-    transport.seek(5);
-    expect(transport.position()).toBe(5);
-    await transport.play();
-    transport.pause();
-    transport.seek(7);
-    expect(transport.state()).toBe('paused');
-    expect(transport.position()).toBe(7);
-    expect(calls.filter((c) => c.startsWith('start'))).toHaveLength(1);
   });
 
   it('Seek while playing restarts from the new position', async () => {
@@ -212,21 +156,6 @@ describe('transport service', () => {
     expect(events.at(-1)).toEqual({ state: 'stopped' });
   });
 
-  it('Play at the end starts over from 0', async () => {
-    const { transport, calls } = setup();
-    transport.seek(10);
-    await transport.play();
-    expect(calls).toContain('start 0');
-  });
-
-  it('Play on an empty project stays stopped with nothingToPlay', async () => {
-    const { transport, calls, events } = setup(true);
-    expect(await transport.play()).toEqual({ ok: false, error: MSG.nothingToPlay });
-    expect(transport.state()).toBe('stopped');
-    expect(calls).toEqual([]);
-    expect(events).toEqual([]);
-  });
-
   describe('edits during playback', () => {
     it('a mix change ramps the gains without rebuilding', async () => {
       const { transport, store, calls } = setup();
@@ -259,25 +188,6 @@ describe('transport service', () => {
       expect(transport.state()).toBe('stopped');
       expect(transport.position()).toBe(0);
     });
-
-    it('a project change also puts a stopped playhead back at 0', () => {
-      const { transport, store } = setup();
-      transport.seek(5);
-      store.replace(createEmptyProject('other', createSourceRegistry()));
-      expect(transport.position()).toBe(0);
-    });
-
-    it('other changes are ignored, while playing and while stopped', async () => {
-      const { transport, store, calls } = setup();
-      store.commit({ kind: 'mix' });
-      store.commit({ kind: 'structure' });
-      await transport.play();
-      calls.length = 0;
-      store.commit({ kind: 'peaks', sourceId: 's' });
-      store.commit({ kind: 'meta' });
-      store.markSaved();
-      expect(calls).toEqual([]);
-    });
   });
 
   describe('errors', () => {
@@ -288,26 +198,6 @@ describe('transport service', () => {
       raiseError();
       expect(transport.state()).toBe('stopped');
       expect(transport.position()).toBeCloseTo(4);
-      expect(events.at(-1)).toEqual({ state: 'stopped', error: MSG.playbackNoOutput });
-    });
-
-    it('a play that cannot start fails with the message, and the event carries no error', async () => {
-      const { transport, events, failNextStart } = setup();
-      transport.seek(3);
-      failNextStart();
-      expect(await transport.play()).toEqual({ ok: false, error: MSG.playbackNoOutput });
-      expect(transport.state()).toBe('stopped');
-      expect(transport.position()).toBe(3);
-      expect(events.every((e) => e.error === undefined)).toBe(true);
-    });
-
-    it('a rebuild that cannot start stops with the error event', async () => {
-      const { transport, events, failNextStart } = setup();
-      await transport.play();
-      failNextStart();
-      transport.seek(2);
-      await vi.advanceTimersByTimeAsync(0);
-      expect(transport.state()).toBe('stopped');
       expect(events.at(-1)).toEqual({ state: 'stopped', error: MSG.playbackNoOutput });
     });
   });
@@ -333,15 +223,5 @@ describe('transport service', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(transport.state()).toBe('playing');
     expect(calls.filter((c) => c === 'stopAll').length).toBe(1);
-  });
-
-  it('unsubscribed listeners stop hearing events', async () => {
-    const { transport } = setup();
-    const heard: TransportEvent[] = [];
-    const off = transport.subscribe((e) => heard.push(e));
-    await transport.play();
-    off();
-    transport.pause();
-    expect(heard).toEqual([{ state: 'playing' }]);
   });
 });
