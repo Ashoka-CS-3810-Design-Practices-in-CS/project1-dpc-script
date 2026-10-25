@@ -31,3 +31,6 @@ e2e/fixtures/generated/
 
 # Claude Code (personal)
 .claude/settings.local.json
+
+# Vercel (created by `vercel link`)
+.vercel
