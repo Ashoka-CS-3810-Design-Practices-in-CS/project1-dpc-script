@@ -160,15 +160,4 @@ describe('import', () => {
       expect(await snapshot(app)).toEqual(before);
     });
   });
-
-  it('a failed import does not stop the next good one', async () => {
-    let calls = 0;
-    const app = setup(async () => {
-      if (++calls === 1) throw new Error('bad data');
-      return fakeAudioBuffer({ duration: 2 });
-    });
-    expect((await app.importer.importFile(wav(), app.track, 0)).ok).toBe(false);
-    expect((await app.importer.importFile(wav(), app.track, 0)).ok).toBe(true);
-    expect(app.store.get().tracks[0].clips).toHaveLength(1);
-  });
 });

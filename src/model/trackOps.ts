@@ -33,17 +33,6 @@ export function removeTrack(p: Project, id: TrackId): Track | null {
   return index < 0 ? null : p.tracks.splice(index, 1)[0];
 }
 
-/** A2 DS1 reorder (no UI for it, README §2.3). */
-export function moveTrack(p: Project, id: TrackId, toIndex: number): void {
-  const from = p.tracks.findIndex((t) => t.id === id);
-  if (from < 0) throw new Error(`No track ${id}.`);
-  if (!Number.isInteger(toIndex) || toIndex < 0 || toIndex >= p.tracks.length) {
-    throw new RangeError(`Track index ${toIndex} is out of range.`);
-  }
-  const [track] = p.tracks.splice(from, 1);
-  p.tracks.splice(toIndex, 0, track);
-}
-
 /** A4: true if a clip at [start, start + duration) fits between its neighbours, ignoring the
  *  clip `ignoreClipId` (the one being moved). Only the clip before and after can collide. */
 export function canPlace(

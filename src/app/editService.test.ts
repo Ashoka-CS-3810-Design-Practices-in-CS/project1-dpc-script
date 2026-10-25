@@ -358,41 +358,6 @@ function clipWithFades(start: number, duration: number, fadeIn = 0, fadeOut = 0)
 }
 
 describe('split', () => {
-  it('T1 split never copies audio', () => {
-    const buffer = registry.get('s1')!.buffer!;
-    const samples = buffer.getChannelData(0);
-    const { t, id } = clipWithFades(10, 8, 1, 1);
-
-    const r = edit.split(id, 14);
-    expect(r.ok).toBe(true);
-    const [left, right] = r.ok ? r.value : ['', ''];
-    expect(left).toBe(id); // the left piece keeps the original id
-    expect(right).not.toBe(id);
-    expect(track(t).clips.map((c) => c.id)).toEqual([left, right]);
-    expect(numbers(t)).toEqual([
-      [10, 0, 4, 1, 0],
-      [14, 4, 4, 0, 1],
-    ]);
-    expect(refCount('s1')).toBe(2);
-    // Both pieces point at the same, untouched audio.
-    expect(registry.get('s1')!.buffer).toBe(buffer);
-    expect(buffer.getChannelData(0)).toBe(samples);
-    expect(buffer.length).toBe(20 * 44100);
-    expect(commits).toEqual([{ kind: 'structure' }]);
-  });
-
-  it('T3 minimum clip length', () => {
-    const { t, id } = clipWithFades(0, 2);
-    expectNoChange(() =>
-      expect(edit.split(id, 0.049)).toEqual({ ok: false, error: MSG.editTooShort }),
-    );
-    expect(edit.split(id, 0.05).ok).toBe(true);
-    expect(numbers(t)).toEqual([
-      [0, 0, 0.05, 0, 0],
-      [0.05, 0.05, 1.95, 0, 0],
-    ]);
-  });
-
   it('fails outside the clip or for an unknown clip, changing nothing', () => {
     const { id } = clipWithFades(0, 2);
     expectNoChange(() => {

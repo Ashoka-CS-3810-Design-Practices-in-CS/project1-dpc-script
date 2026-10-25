@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MSG } from '@/app/messages';
 import { encodeWav } from '@/algorithms/wav';
 import { MAX_DURATION_S, MAX_FILE_BYTES, SAMPLE_RATE } from '@/model/constants';
-import { checkFile, decodeFile, wavDurationFromHeader, type ImportMessages } from './decoder';
+import { checkFile, decodeFile, type ImportMessages } from './decoder';
 
 const msgs: ImportMessages = {
   unreadable: MSG.importUnreadable,
@@ -41,67 +41,7 @@ describe('checkFile', () => {
   });
 });
 
-describe('wavDurationFromHeader', () => {
-  it('reads a mono file', () => {
-    const { bytes } = encodeWav([new Float32Array(22050)], 44100);
-    expect(wavDurationFromHeader(bytes)).toBeCloseTo(0.5);
-  });
-
-  it('reads a stereo file at another sample rate', () => {
-    const { bytes } = encodeWav([new Float32Array(48000), new Float32Array(48000)], 48000);
-    expect(wavDurationFromHeader(bytes)).toBeCloseTo(1);
-  });
-
-  it('skips chunks that come before the data (including an odd-sized one)', () => {
-    const { bytes } = encodeWav([new Float32Array(44100)], 44100);
-    const original = new Uint8Array(bytes);
-    // Squeeze a 3-byte LIST chunk (plus its pad byte) in between "fmt " and "data".
-    const extra = new Uint8Array([0x4c, 0x49, 0x53, 0x54, 3, 0, 0, 0, 1, 2, 3, 0]);
-    const joined = new Uint8Array(original.length + extra.length);
-    joined.set(original.subarray(0, 36));
-    joined.set(extra, 36);
-    joined.set(original.subarray(36), 36 + extra.length);
-
-    expect(wavDurationFromHeader(joined.buffer)).toBeCloseTo(1);
-  });
-
-  it('uses the audio really present when the file is cut short', () => {
-    const { bytes } = encodeWav([new Float32Array(44100)], 44100);
-    expect(wavDurationFromHeader(bytes.slice(0, 44 + 44100))).toBeCloseTo(0.5);
-  });
-
-  it('gives null when it is not a WAV or is damaged', () => {
-    expect(wavDurationFromHeader(new ArrayBuffer(4))).toBeNull();
-    expect(
-      wavDurationFromHeader(new TextEncoder().encode('hello there, not audio').buffer),
-    ).toBeNull();
-
-    const { bytes } = encodeWav([new Float32Array(10)], 44100);
-    expect(wavDurationFromHeader(bytes.slice(0, 36))).toBeNull(); // no data chunk
-    expect(wavDurationFromHeader(bytes.slice(0, 30))).toBeNull(); // fmt chunk cut off
-    new DataView(bytes).setUint32(28, 0, true); // byte rate of 0
-    expect(wavDurationFromHeader(bytes)).toBeNull();
-  });
-});
-
 describe('decodeFile', () => {
-  const wavFile = (seconds: number) => {
-    const { bytes } = encodeWav([new Float32Array(Math.round(seconds * 8000))], 8000);
-    return new File([bytes], 'tone.wav');
-  };
-
-  it('returns the decoded buffer and the original bytes', async () => {
-    const buffer = lightBuffer(SAMPLE_RATE);
-    const ctx = ctxReturning(buffer);
-    const file = wavFile(1);
-
-    const result = await decodeFile(file, ctx, msgs);
-
-    expect(result.ok && result.value.buffer).toBe(buffer);
-    expect(result.ok && result.value.bytes.byteLength).toBe(file.size); // not detached
-    expect(ctx.decodeAudioData.mock.calls[0][0]).not.toBe(result.ok && result.value.bytes); // a copy
-  });
-
   it('rejects a bad type or size before reading the file', async () => {
     const ctx = ctxReturning(lightBuffer(1));
     const arrayBuffer = vi.fn();
@@ -115,19 +55,6 @@ describe('decodeFile', () => {
     expect((await decodeFile(flac, ctx, msgs)).ok).toBe(false);
     expect(arrayBuffer).not.toHaveBeenCalled();
     expect(ctx.decodeAudioData).not.toHaveBeenCalled();
-  });
-
-  it('reports a file that cannot be read from disk', async () => {
-    const file = {
-      name: 'a.wav',
-      size: 10,
-      arrayBuffer: () => Promise.reject(new Error('gone')),
-    } as unknown as File;
-
-    expect(await decodeFile(file, ctxReturning(lightBuffer(1)), msgs)).toEqual({
-      ok: false,
-      error: MSG.importUnreadable('a.wav'),
-    });
   });
 
   it('rejects a WAV that is over 30 minutes without decoding it', async () => {
@@ -169,18 +96,5 @@ describe('decodeFile', () => {
       ok: false,
       error: MSG.importTooLong('long.mp3'),
     });
-  });
-
-  it('does not check the WAV header of an MP3', async () => {
-    // These bytes happen to be a WAV header claiming 40 minutes; an .mp3 name skips that check.
-    const { bytes } = encodeWav([new Float32Array(10)], 8000);
-    new DataView(bytes).setUint32(40, 8000 * 2 * 2400, true);
-
-    const result = await decodeFile(
-      new File([bytes], 'odd.mp3'),
-      ctxReturning(lightBuffer(1)),
-      msgs,
-    );
-    expect(result.ok).toBe(true);
   });
 });

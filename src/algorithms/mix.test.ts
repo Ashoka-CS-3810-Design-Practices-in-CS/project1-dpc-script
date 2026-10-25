@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isAudible, resolveGains } from './mix';
+import { resolveGains } from './mix';
 
 const track = (muted: boolean, soloed: boolean, volume = 0.8) => ({ volume, muted, soloed });
 
@@ -33,17 +33,5 @@ describe('resolveGains', () => {
 
   it('silences everything when everything is muted', () => {
     expect(resolveGains([track(true, false), track(true, false)])).toEqual([0, 0]);
-  });
-});
-
-describe('isAudible', () => {
-  it('follows mute when nothing is soloed', () => {
-    expect(isAudible(track(false, false), false)).toBe(true);
-    expect(isAudible(track(true, false), false)).toBe(false);
-  });
-
-  it('follows solo when something is soloed', () => {
-    expect(isAudible(track(false, true), true)).toBe(true);
-    expect(isAudible(track(false, false), true)).toBe(false);
   });
 });

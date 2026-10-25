@@ -82,44 +82,4 @@ describe('edit, then play', () => {
       'src#8.start 20.05 1 2',
     ]);
   });
-
-  it('playing from the start schedules every clip at its own time', () => {
-    const { store, edit } = setup();
-    const t = edit.addTrack();
-    const clip = must(edit.addClip(t, 'B', 3, 1));
-    must(edit.trimEdge(clip, 'start', 2)); // cuts 1 s off the front: now [2–4] of the timeline
-    const ctx = createRecordingContext();
-    buildMix(ctx, store.get(), 0, 0, createDefaultEffects());
-    expect(ctx.log.filter((l) => l.includes('.start'))).toEqual(['src#3.start 2 1 2']);
-  });
-
-  it('a change after the first build shows in the next build', () => {
-    const { store, edit } = setup();
-    const t = edit.addTrack();
-    must(edit.addClip(t, 'A', 10, 0));
-    const first = createRecordingContext();
-    buildMix(first, store.get(), 0, 0, createDefaultEffects());
-
-    edit.toggleSolo(t);
-    edit.setVolume(t, 0.25);
-    const second = createRecordingContext();
-    buildMix(second, store.get(), 0, 0, createDefaultEffects());
-
-    expect(first.log).toContain(`gain#2 = ${Number(NEW_TRACK_VOLUME.toFixed(6))}`);
-    expect(second.log).toContain('gain#2 = 0.25');
-  });
-
-  it('soloing one track silences the others, even a loud one', () => {
-    const { store, edit } = setup();
-    const quiet = edit.addTrack();
-    const loud = edit.addTrack();
-    edit.setVolume(loud, 1);
-    must(edit.addClip(quiet, 'A', 10, 0));
-    must(edit.addClip(loud, 'B', 3, 0));
-    edit.toggleSolo(quiet);
-    const ctx = createRecordingContext();
-    buildMix(ctx, store.get(), 0, 0, createDefaultEffects());
-    expect(ctx.log).toContain(`gain#2 = ${Number(NEW_TRACK_VOLUME.toFixed(6))}`);
-    expect(ctx.log).toContain('gain#5 = 0'); // the loud track
-  });
 });

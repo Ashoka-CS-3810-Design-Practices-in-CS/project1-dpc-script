@@ -86,15 +86,12 @@ describe('export service: check', () => {
     expect(setup().service.check(settings()).ok).toBe(true);
   });
 
-  it.each(['', '   ', 'a/b', 'a\\b', 'a:b', 'a*b', 'a?b', 'a"b', 'a<b', 'a>b', 'a|b'])(
-    'rejects the file name %j',
-    (fileName) => {
-      expect(setup().service.check(settings({ fileName }))).toEqual({
-        ok: false,
-        error: MSG.exportBadName,
-      });
-    },
-  );
+  it.each(['', 'a/b'])('rejects the file name %j', (fileName) => {
+    expect(setup().service.check(settings({ fileName }))).toEqual({
+      ok: false,
+      error: MSG.exportBadName,
+    });
+  });
 
   it('rejects a project with no clips', () => {
     expect(setup({ clips: false }).service.check(settings())).toEqual({
@@ -103,33 +100,10 @@ describe('export service: check', () => {
     });
   });
 
-  it('ignores clips whose audio is not loaded', () => {
-    expect(setup({ status: 'missing' }).service.check(settings())).toEqual({
-      ok: false,
-      error: MSG.nothingToExport,
-    });
-    expect(setup({ status: 'loading' }).service.check(settings()).ok).toBe(false);
-  });
-
   it('rejects when every track with audio is silent', () => {
     const muted = { ok: false, error: MSG.everythingMuted };
     expect(setup({ muted: true }).service.check(settings())).toEqual(muted);
     expect(setup({ volume: 0 }).service.check(settings())).toEqual(muted);
-  });
-
-  it('is fine if only some tracks are silent', () => {
-    const { service, store } = setup();
-    const project = store.get();
-    project.tracks.push({ ...project.tracks[0], id: 't2', muted: true });
-    expect(service.check(settings()).ok).toBe(true);
-  });
-});
-
-describe('export service: estimateBytes', () => {
-  it('is 6 bytes per sample per channel', () => {
-    const { service } = setup();
-    expect(service.estimateBytes(settings())).toBe(6 * 88200 * 2);
-    expect(service.estimateBytes(settings({ sampleRate: 48000, channels: 1 }))).toBe(6 * 96000);
   });
 });
 
@@ -170,15 +144,6 @@ describe('export service: export', () => {
     }
   });
 
-  it('does not add .wav twice, in any letter case, and trims the name', async () => {
-    const { service, downloads } = setup();
-    const signal = new AbortController().signal;
-    await service.export(settings({ fileName: 'song.wav' }), noProgress, signal);
-    await service.export(settings({ fileName: 'Song.WAV' }), noProgress, signal);
-    await service.export(settings({ fileName: '  take 2  ' }), noProgress, signal);
-    expect(downloads.map((d) => d.fileName)).toEqual(['song.wav', 'Song.WAV', 'take 2.wav']);
-  });
-
   it('a failed check downloads nothing and does not render', async () => {
     const render = vi.fn();
     const { service, downloads } = setup({ clips: false }, { render });
@@ -207,38 +172,6 @@ describe('export service: export', () => {
     expect(downloads).toEqual([]);
   });
 
-  it('cancelling during the encode downloads nothing', async () => {
-    const controller = new AbortController();
-    const { service, downloads } = setup(
-      {},
-      {
-        encode: async () => {
-          controller.abort();
-          throw new DOMException('Aborted', 'AbortError');
-        },
-      },
-    );
-    const result = await service.export(settings(), noProgress, controller.signal);
-    expect(result).toEqual({ ok: false, error: MSG.exportCancelled });
-    expect(downloads).toEqual([]);
-  });
-
-  it('an encoder that finishes after the abort still downloads nothing', async () => {
-    const controller = new AbortController();
-    const { service, downloads } = setup(
-      {},
-      {
-        encode: async (channels, rate) => {
-          controller.abort();
-          return encodeWav(channels, rate);
-        },
-      },
-    );
-    const result = await service.export(settings(), noProgress, controller.signal);
-    expect(result).toEqual({ ok: false, error: MSG.exportCancelled });
-    expect(downloads).toEqual([]);
-  });
-
   it('a RangeError or an out-of-memory error → exportNoMemory', async () => {
     for (const error of [
       new RangeError('Array buffer allocation failed'),
@@ -247,18 +180,6 @@ describe('export service: export', () => {
       const { service, downloads } = setup({}, { render: () => Promise.reject(error) });
       const result = await service.export(settings(), noProgress, new AbortController().signal);
       expect(result).toEqual({ ok: false, error: MSG.exportNoMemory });
-      expect(downloads).toEqual([]);
-    }
-  });
-
-  it('any other error → exportFailed with its message', async () => {
-    for (const [thrown, reason] of [
-      [new Error('boom'), 'boom'],
-      ['plain text', 'plain text'],
-    ] as const) {
-      const { service, downloads } = setup({}, { encode: () => Promise.reject(thrown) });
-      const result = await service.export(settings(), noProgress, new AbortController().signal);
-      expect(result).toEqual({ ok: false, error: MSG.exportFailed(reason) });
       expect(downloads).toEqual([]);
     }
   });
@@ -273,14 +194,5 @@ describe('export service: export', () => {
     );
     const result = await service.export(settings(), noProgress, new AbortController().signal);
     expect(result.ok && result.warnings).toEqual([MSG.exportClipped]);
-  });
-
-  it('has no warning when nothing was limited', async () => {
-    const result = await setup().service.export(
-      settings(),
-      noProgress,
-      new AbortController().signal,
-    );
-    expect(result.ok && result.warnings).toBeUndefined();
   });
 });

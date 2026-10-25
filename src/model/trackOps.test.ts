@@ -4,7 +4,6 @@ import {
   addTrack,
   canPlace,
   insertClip,
-  moveTrack,
   removeClipAt,
   removeTrack,
   replaceClipAt,
@@ -49,16 +48,6 @@ describe('tracks', () => {
     expect(removeTrack(p, 't1')?.id).toBe('t1');
     expect(removeTrack(p, 'nope')).toBeNull();
     expect(p.tracks.map((t) => t.id)).toEqual(['t2']);
-  });
-
-  it('moveTrack reorders and rejects bad ids and indexes', () => {
-    const p = project(track('t1'), track('t2'), track('t3'));
-    moveTrack(p, 't1', 2);
-    expect(p.tracks.map((t) => t.id)).toEqual(['t2', 't3', 't1']);
-    expect(() => moveTrack(p, 'nope', 0)).toThrow();
-    expect(() => moveTrack(p, 't1', 3)).toThrow(RangeError);
-    expect(() => moveTrack(p, 't1', -1)).toThrow(RangeError);
-    expect(() => moveTrack(p, 't1', 0.5)).toThrow(RangeError);
   });
 });
 

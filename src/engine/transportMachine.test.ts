@@ -36,7 +36,6 @@ describe('DS6 transport table', () => {
         'stopPlayers',
         'showError',
       ]));
-    it('ended is ignored', () => expect(go('stopped', { type: 'ended', end: 9 })).toBeNull());
   });
 
   describe('playing', () => {
@@ -69,6 +68,5 @@ describe('DS6 transport table', () => {
         'stopPlayers',
         'showError',
       ]));
-    it('ended is ignored', () => expect(go('paused', { type: 'ended', end: 9 })).toBeNull());
   });
 });

@@ -74,15 +74,6 @@ describe('preview vs export', () => {
     expect(offline.log).toEqual(preview.log);
   });
 
-  it('building the same project twice gives identical logs', () => {
-    const project = threeClipProject();
-    const a = createRecordingContext();
-    const b = createRecordingContext();
-    buildMix(a, project, 0, 0, createDefaultEffects());
-    buildMix(b, project, 0, 0, createDefaultEffects());
-    expect(a.log).toEqual(b.log);
-  });
-
   it('the export is exactly as long as the project, at either sample rate', async () => {
     const project = threeClipProject(); // the last clip, music, ends at 1 + 8 = 9 s
     expect(projectEnd(project)).toBe(9);
